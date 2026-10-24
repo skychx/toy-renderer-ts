@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>day1：环境搭建</title>
+    <style>
+      body { margin: 24px; font-family: sans-serif; }
+      figure { display: inline-block; margin: 0 24px 24px 0; vertical-align: top; }
+      canvas { border: 1px solid #ddd; }
+    </style>
+  </head>
+  <body>
+    <h1>day1：环境搭建</h1>
+    <figure>
+      <!-- 画布只有 100×100，这里放大 4 倍显示，image-rendering: pixelated 让放大后的像素保持清晰的方块 -->
+      <canvas id="dot" style="width: 400px; image-rendering: pixelated"></canvas>
+      <figcaption>在 (52, 41) 画一个红点（放大 4 倍显示）</figcaption>
+    </figure>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
