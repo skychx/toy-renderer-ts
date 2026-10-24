@@ -5,7 +5,7 @@
  * 想要实现不同的效果，只需要在 main.ts 里写不同的着色器（Shader）
  */
 import { Frame, Color } from './frame';
-import { Mat, Vec2, Vec3, Vec4, cross, matMul, matVec, normalize, sub } from './math';
+import { Mat, Vec3, Vec4, cross, matMul, matVec, normalize, sub } from './math';
 
 // 视图矩阵：把世界坐标变换到相机的坐标系下（OpenGL 的版本，和 day6 的只差了平移这一步）
 export function lookAt(eye: Vec3, center: Vec3, up: Vec3): Mat {
@@ -63,23 +63,6 @@ export interface IShader {
   fragment(bar: Vec3, fragCoord: Vec3): Color | null;
 }
 
-// 利用重心坐标判断点是否在三角形内部
-function barycentric(pts: Vec3[], P: Vec2): Vec3 {
-  const [A, B, C] = pts;
-  const x: Vec3 = [B[0] - A[0], C[0] - A[0], A[0] - P[0]]; // AB、AC、PA 在 x 轴上的分量
-  const y: Vec3 = [B[1] - A[1], C[1] - A[1], A[1] - P[1]]; // AB、AC、PA 在 y 轴上的分量
-
-  // [u, v, 1] 和 x、y 两个向量的点乘都为 0，所以 x、y 叉乘得到的向量和 [u, v, 1] 平行
-  const u = cross(x, y);
-
-  // A、B、C、P 的 x、y 坐标都是整数，所以 u[2] 也一定是整数
-  // 所以 u[2] 的绝对值小于 1 意味着它就是 0，三角形退化成了一条线段，直接舍弃
-  if (Math.abs(u[2]) < 1) {
-    return [-1, 1, 1];
-  }
-  return [1 - (u[0] + u[1]) / u[2], u[0] / u[2], u[1] / u[2]];
-}
-
 // 光栅化：把顶点着色器输出的三个裁剪坐标变换到屏幕上，然后对三角形里的每个像素调用片元着色器
 // perspectiveCorrect 为 false 时，直接用屏幕上的重心坐标插值（也就是前十天的做法）
 export function triangle(
@@ -96,6 +79,17 @@ export function triangle(
     return [Math.round(x / w), Math.round(y / w), z / w];
   });
 
+  // Before：每个候选像素都构造向量、做叉乘，重复计算同一组三角形边和面积
+  // After：先算好 AB、AC 和有向面积；像素循环里只计算随 P 变化的分子
+  const [A, B, C] = pts;
+  const abX = B[0] - A[0];
+  const acX = C[0] - A[0];
+  const abY = B[1] - A[1];
+  const acY = C[1] - A[1];
+  const area = abX * acY - acX * abY;
+  // 屏幕坐标已经取整，面积小于 1 就是 0：整块三角形退化，直接跳过
+  if (Math.abs(area) < 1) return;
+
   // 找出包围盒，包围盒不能超出画布的边界
   const xs = pts.map(p => p[0]);
   const ys = pts.map(p => p[1]);
@@ -107,7 +101,12 @@ export function triangle(
   // 遍历包围盒里的每一个像素
   for (let x = minX; x <= maxX; x++) {
     for (let y = minY; y <= maxY; y++) {
-      const bc = barycentric(pts, [x, y]);
+      // 仍然是原来的叉乘公式，只把固定的 AB、AC、area 移到了循环外
+      const paX = A[0] - x;
+      const paY = A[1] - y;
+      const u = acX * paY - paX * acY;
+      const v = paX * abY - abX * paY;
+      const bc: Vec3 = [1 - (u + v) / area, u / area, v / area];
       if (bc[0] < 0 || bc[1] < 0 || bc[2] < 0) {
         continue;
       }
