@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>番外：卡通渲染</title>
+    <style>
+      body {
+        margin: 24px;
+        font-family: sans-serif;
+      }
+      figure {
+        display: inline-block;
+        margin: 0 24px 24px 0;
+        vertical-align: top;
+      }
+      canvas {
+        border: 1px solid #ddd;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>番外：卡通渲染</h1>
+    <figure>
+      <canvas id="smooth"></canvas>
+      <figcaption>平滑的光照</figcaption>
+    </figure>
+    <figure>
+      <canvas id="bands"></canvas>
+      <figcaption>光照分成 3 档</figcaption>
+    </figure>
+    <figure>
+      <canvas id="edges"></canvas>
+      <figcaption>Sobel 边缘检测</figcaption>
+    </figure>
+    <figure>
+      <canvas id="toon"></canvas>
+      <figcaption>色阶 + 描边</figcaption>
+    </figure>
+    <figure>
+      <canvas id="head"></canvas>
+      <figcaption>换成人头试试</figcaption>
+    </figure>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
