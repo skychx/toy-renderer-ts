@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>day3：画一个三角形</title>
+    <style>
+      body { margin: 24px; font-family: sans-serif; }
+      figure { display: inline-block; margin: 0 24px 24px 0; vertical-align: top; }
+      canvas { border: 1px solid #ddd; }
+    </style>
+  </head>
+  <body>
+    <h1>day3：画一个三角形</h1>
+    <figure>
+      <canvas id="cross-product"></canvas>
+      <figcaption>用叉乘画三角形</figcaption>
+    </figure>
+    <figure>
+      <canvas id="barycentric"></canvas>
+      <figcaption>用重心坐标画三角形</figcaption>
+    </figure>
+    <br />
+    <figure>
+      <canvas id="random-colors"></canvas>
+      <figcaption>随机着色</figcaption>
+    </figure>
+    <figure>
+      <canvas id="light"></canvas>
+      <figcaption>简单的光照着色</figcaption>
+    </figure>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
