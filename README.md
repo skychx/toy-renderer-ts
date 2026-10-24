@@ -9,7 +9,7 @@
 先安装 [Bun](https://bun.sh/)，然后：
 
 ```bash
-bun install   # 只装了 TypeScript 的类型检查工具，渲染器本身不依赖任何第三方库
+bun install   # 只装了 Bun 的类型声明，渲染器本身不依赖任何第三方库
 bun dev
 ```
 
