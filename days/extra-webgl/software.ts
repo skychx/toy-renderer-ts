@@ -47,6 +47,7 @@ function sampleNormal(texture: Texture, uv: Vec2): Vec3 {
 // 和 WebGL 的着色器做一样的事：切线空间的法线贴图 + Phong 光照，基本就是 day8 的 TangentShader
 class PhongShader implements IShader {
   uniforms: Uniforms;
+  light: Vec3; // 这一帧的单位光照方向（相机坐标系）
   varyingUV: Vec2[] = [
     [0, 0],
     [0, 0],
@@ -66,6 +67,9 @@ class PhongShader implements IShader {
 
   constructor(uniforms: Uniforms) {
     this.uniforms = uniforms;
+    // Before：每个像素都对同一个光照方向求长度、做归一化
+    // After：每帧创建 shader 时只算一次，fragment() 直接复用
+    this.light = normalize(uniforms.light);
   }
 
   vertex(iface: number, nthvert: number): Vec4 {
@@ -114,7 +118,7 @@ class PhongShader implements IShader {
     }
 
     // Phong 光照模型
-    const l = normalize(this.uniforms.light);
+    const l = this.light;
     // 反射光的方向：r = 2n(n·l) - l
     const r = normalize(sub(scale(perturbed, 2 * dot(perturbed, l)), l));
     // 相机在原点，从物体指向相机的方向就是这个像素位置的反方向
