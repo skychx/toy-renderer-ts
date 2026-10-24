@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>day8：Phong 光照与法线贴图</title>
+    <style>
+      body {
+        margin: 24px;
+        font-family: sans-serif;
+      }
+      figure {
+        display: inline-block;
+        margin: 0 24px 24px 0;
+        vertical-align: top;
+      }
+      canvas {
+        border: 1px solid #ddd;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>day8：Phong 光照与法线贴图</h1>
+    <figure>
+      <canvas id="normal-map"></canvas>
+      <figcaption>模型空间的法线贴图</figcaption>
+    </figure>
+    <figure>
+      <canvas id="ambient"></canvas>
+      <figcaption>环境光</figcaption>
+    </figure>
+    <figure>
+      <canvas id="diffuse"></canvas>
+      <figcaption>漫反射</figcaption>
+    </figure>
+    <figure>
+      <canvas id="specular"></canvas>
+      <figcaption>高光</figcaption>
+    </figure>
+    <figure>
+      <canvas id="phong-gray"></canvas>
+      <figcaption>三者加起来</figcaption>
+    </figure>
+    <figure>
+      <canvas id="phong"></canvas>
+      <figcaption>Phong 光照 + 纹理</figcaption>
+    </figure>
+    <figure>
+      <canvas id="tangent"></canvas>
+      <figcaption>切线空间的法线贴图</figcaption>
+    </figure>
+    <figure>
+      <canvas id="grid"></canvas>
+      <figcaption>换成网格贴图</figcaption>
+    </figure>
+    <figure>
+      <canvas id="diablo-nm"></canvas>
+      <figcaption>暗黑破坏神：模型空间的法线贴图</figcaption>
+    </figure>
+    <figure>
+      <canvas id="diablo-tangent"></canvas>
+      <figcaption>暗黑破坏神：切线空间的法线贴图</figcaption>
+    </figure>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
