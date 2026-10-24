@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>day6：移动相机</title>
+    <style>
+      body {
+        margin: 24px;
+        font-family: sans-serif;
+      }
+      figure {
+        display: inline-block;
+        margin: 0 24px 24px 0;
+        vertical-align: top;
+      }
+      canvas {
+        border: 1px solid #ddd;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>day6：移动相机</h1>
+    <figure>
+      <canvas id="flat"></canvas>
+      <figcaption>flat 着色</figcaption>
+    </figure>
+    <figure>
+      <canvas id="gouraud"></canvas>
+      <figcaption>Gouraud 着色</figcaption>
+    </figure>
+    <figure>
+      <canvas id="texture"></canvas>
+      <figcaption>Gouraud 着色 + 纹理</figcaption>
+    </figure>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
