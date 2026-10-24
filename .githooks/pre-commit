@@ -1,0 +1,4 @@
+#!/bin/sh
+# 提交前用 bun fmt 格式化暂存区里的文件，再重新加入暂存区
+# 启用方法：git config core.hooksPath .githooks
+bun fmt --staged
