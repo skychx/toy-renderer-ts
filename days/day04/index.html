@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>day4：Z-buffering</title>
+    <style>
+      body { margin: 24px; font-family: sans-serif; }
+      figure { display: inline-block; margin: 0 24px 24px 0; vertical-align: top; }
+      canvas { border: 1px solid #ddd; }
+    </style>
+  </head>
+  <body>
+    <h1>day4：Z-buffering</h1>
+    <figure>
+      <canvas id="zbuffer-model"></canvas>
+      <figcaption>加入 zbuffer 后的渲染结果</figcaption>
+    </figure>
+    <figure>
+      <canvas id="zbuffer-image"></canvas>
+      <figcaption>zbuffer 画成的灰度图</figcaption>
+    </figure>
+    <figure>
+      <canvas id="texture"></canvas>
+      <figcaption>纹理贴图</figcaption>
+    </figure>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
