@@ -2,182 +2,292 @@ import { lookAt, perspective } from './gl';
 import { Mat, Vec3, inverse, transformDirection, transpose } from './math';
 import { loadModel } from './model';
 
-// 顶点着色器：对应 IShader 的 vertex()
-const vertexShaderSource = `#version 300 es
-in vec3 aPosition; // 顶点的位置
-in vec3 aNormal;   // 顶点的法线
-in vec2 aUV;       // 顶点的 uv
+// WGSL 是 WebGPU 的着色器语言：同一个模块里可以写顶点和片元两个入口
+const shaderSource = `
+struct Uniforms {
+  ModelView: mat4x4<f32>,
+  ModelViewIT: mat4x4<f32>, // ModelView 的逆转置矩阵，用来变换法线
+  Projection: mat4x4<f32>,
+  light: vec4<f32>, // uniform 按 16 字节对齐，方向只用 xyz，w 补 0
+}
 
-uniform mat4 uModelView;
-uniform mat4 uModelViewIT; // ModelView 的逆转置矩阵，用来变换法线
-uniform mat4 uProjection;
+// binding 是资源的编号，和下面 createBindGroup() 里的编号一一对应
+@group(0) @binding(0) var<uniform> u: Uniforms;
+@group(0) @binding(1) var textureSampler: sampler;
+@group(0) @binding(2) var diffuseMap: texture_2d<f32>;
+@group(0) @binding(3) var normalMap: texture_2d<f32>;
+@group(0) @binding(4) var specularMap: texture_2d<f32>;
 
-// out 变量就是 varying：显卡会把三个顶点的值插值好，再交给片元着色器
-out vec2 vUV;
-out vec3 vNormal;   // 顶点的法线（相机坐标系）
-out vec3 vPosition; // 顶点的位置（相机坐标系）
+struct VertexOutput {
+  @builtin(position) clipPosition: vec4<f32>,
+  // location 对应 varying：显卡会做透视校正插值，再把结果交给片元着色器
+  @location(0) uv: vec2<f32>,
+  @location(1) normal: vec3<f32>,
+  @location(2) position: vec3<f32>, // 相机坐标系下的位置
+}
 
-void main() {
-  vUV = aUV;
-  vNormal = (uModelViewIT * vec4(aNormal, 0.0)).xyz;
-  // 先变换到相机坐标系，记下来给片元着色器算切线用，再做投影
-  vec4 p = uModelView * vec4(aPosition, 1.0);
-  vPosition = p.xyz;
-  gl_Position = uProjection * p;
+// 对应软渲染器 IShader 的 vertex()
+@vertex
+fn vertexMain(
+  @location(0) position: vec3<f32>,
+  @location(1) normal: vec3<f32>,
+  @location(2) uv: vec2<f32>,
+) -> VertexOutput {
+  var out: VertexOutput;
+  let p = u.ModelView * vec4<f32>(position, 1.0);
+  let clip = u.Projection * p;
+  // 共用的投影矩阵沿用 OpenGL 的深度范围 [-w, w]，WebGPU 要求 [0, w]
+  // z' = (z + w) / 2，两边的相机和投影效果仍然一致
+  out.clipPosition = vec4<f32>(clip.xy, (clip.z + clip.w) * 0.5, clip.w);
+  out.uv = uv;
+  out.normal = (u.ModelViewIT * vec4<f32>(normal, 0.0)).xyz;
+  out.position = p.xyz;
+  return out;
+}
+
+// 对应软渲染器 IShader 的 fragment()
+@fragment
+fn fragmentMain(in: VertexOutput) -> @location(0) vec4<f32> {
+  // 图片像素从上往下存，模型的 uv 原点在左下角，所以把 v 翻转一下
+  let uv = vec2<f32>(in.uv.x, 1.0 - in.uv.y);
+  let n = normalize(in.normal);
+
+  // textureSample 需要用相邻片元的导数选择 mip 层级，必须放在分支外统一执行
+  let color = textureSample(diffuseMap, textureSampler, uv).rgb;
+  let nm = normalize(textureSample(normalMap, textureSampler, uv).rgb * 2.0 - 1.0);
+  let strength = textureSample(specularMap, textureSampler, uv).r;
+
+  // 用相邻像素的位置差和 uv 差解出切线 T、副切线 B
+  let dx = dpdx(in.position);
+  let dy = dpdy(in.position);
+  let uvDx = dpdx(in.uv);
+  let uvDy = dpdy(in.uv);
+  let det = uvDx.x * uvDy.y - uvDy.x * uvDx.y;
+  var perturbed = n;
+  if (abs(det) > 1e-12) {
+    // WGSL 没有通用的 inverse()，这里把 2×2 逆矩阵的公式直接展开
+    let T = normalize((dx * uvDy.y - dy * uvDx.y) / det);
+    let B = normalize((dy * uvDx.x - dx * uvDy.x) / det);
+    perturbed = normalize(T * nm.x + B * nm.y + n * nm.z);
+  }
+
+  // 和软渲染器一样的 Phong 光照：环境光 + 漫反射 + 高光
+  let l = normalize(u.light.xyz);
+  let r = normalize(2.0 * perturbed * dot(perturbed, l) - l);
+  let v = normalize(-in.position);
+  let ambient = 0.3;
+  let diffuse = max(0.0, dot(perturbed, l));
+  let specular = strength * pow(max(0.0, dot(r, v)), 20.0);
+  return vec4<f32>(color * (ambient + diffuse) + specular, 1.0);
 }
 `;
 
-// 片元着色器：对应 IShader 的 fragment()
-const fragmentShaderSource = `#version 300 es
-precision highp float;
-
-in vec2 vUV;
-in vec3 vNormal;
-in vec3 vPosition;
-
-uniform sampler2D uDiffuse;   // 漫反射贴图
-uniform sampler2D uNormalMap; // 法线贴图（切线空间）
-uniform sampler2D uSpecular;  // 高光贴图
-uniform vec3 uLight;          // 相机坐标系下，指向光源的方向
-
-out vec4 fragColor; // 这个像素最终的颜色
-
-void main() {
-  // uv 坐标的原点在图片的左下角，而图片的像素是从上往下存的，所以 v 要翻转一下
-  vec2 uv = vec2(vUV.x, 1.0 - vUV.y);
-  // 插值出来的顶点法线，切线空间的 z 轴
-  vec3 n = normalize(vNormal);
-
-  // 用相邻像素之间位置的差和 uv 的差，求出切线 t 和副切线 b
-  mat2x3 E = mat2x3(dFdx(vPosition), dFdy(vPosition));
-  mat2 U = mat2(dFdx(vUV), dFdy(vUV));
-  vec3 perturbed = n;
-  // uv 的差退化成了一条线（行列式为 0）时没法算切线，直接用插值出来的法线
-  if (abs(determinant(U)) > 1e-12) {
-    mat2x3 TB = E * inverse(U);
-    vec3 t = normalize(TB[0]);
-    vec3 b = normalize(TB[1]);
-    // 切线空间里的法线 (x, y, z)，意思是 x 个 t 加 y 个 b 再加 z 个 n
-    vec3 nm = normalize(texture(uNormalMap, uv).rgb * 2.0 - 1.0);
-    perturbed = normalize(t * nm.x + b * nm.y + n * nm.z);
-  }
-
-  // Phong 光照模型
-  vec3 l = normalize(uLight);
-  // 反射光的方向：r = 2n(n·l) - l
-  vec3 r = normalize(2.0 * perturbed * dot(perturbed, l) - l);
-  // 相机在原点，从物体指向相机的方向就是 -vPosition，不用再近似成 (0, 0, 1) 了
-  vec3 v = normalize(-vPosition);
-
-  float ambient = 0.3;
-  float diffuse = max(0.0, dot(perturbed, l));
-  float specular = texture(uSpecular, uv).r * pow(max(0.0, dot(r, v)), 20.0);
-
-  // 颜色的取值范围是 [0, 1]，超过 1 的部分，显卡会自动截断
-  vec3 color = texture(uDiffuse, uv).rgb;
-  fragColor = vec4(color * (ambient + diffuse) + specular, 1.0);
-}
-`;
-
-const canvas = document.querySelector<HTMLCanvasElement>('#webgl')!;
-const gl = canvas.getContext('webgl2')!;
-
-// 编译一个着色器，有语法错误的话，直接把错误信息抛出来
-function compileShader(type: number, source: string) {
-  const shader = gl.createShader(type)!;
-  gl.shaderSource(shader, source);
-  gl.compileShader(shader);
-  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-    throw new Error(gl.getShaderInfoLog(shader)!);
-  }
-  return shader;
-}
-
-// 把顶点着色器和片元着色器链接成一个程序
-const program = gl.createProgram();
-gl.attachShader(program, compileShader(gl.VERTEX_SHADER, vertexShaderSource));
-gl.attachShader(program, compileShader(gl.FRAGMENT_SHADER, fragmentShaderSource));
-gl.linkProgram(program);
-if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-  throw new Error(gl.getProgramInfoLog(program)!);
-}
-gl.useProgram(program);
-
-const model = await loadModel('/obj/african_head/african_head.obj');
-
-// obj 里的顶点、uv、法线各有各的序号，显卡却要求同一个顶点的数据用同一个序号，
-// 所以我们按三角形把每个顶点的数据都展开，三个顶点一组
-const positions: number[] = [];
-const normals: number[] = [];
-const uvs: number[] = [];
-for (let i = 0; i < model.nfaces(); i++) {
-  for (let j = 0; j < 3; j++) {
-    positions.push(...model.vert(i, j));
-    normals.push(...model.normal(i, j));
-    uvs.push(...model.uv(i, j));
-  }
-}
-
-// 把一组顶点数据传给显卡，告诉顶点着色器里名叫 name 的 in 变量：从这里读，每个顶点读 size 个数
-function createAttribute(name: string, data: number[], size: number) {
-  const buffer = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
-  const location = gl.getAttribLocation(program, name);
-  gl.enableVertexAttribArray(location);
-  gl.vertexAttribPointer(location, size, gl.FLOAT, false, 0, 0);
-}
-
-createAttribute('aPosition', positions, 3);
-createAttribute('aNormal', normals, 3);
-createAttribute('aUV', uvs, 2);
-
-// 读取一张贴图，放到显卡的第 unit 号纹理单元上，再告诉片元着色器里名叫 name 的变量去这里读
-async function loadTexture(url: string, unit: number, name: string) {
-  const blob = await (await fetch(url)).blob();
-  // 和 texture.ts 一样，不能让浏览器做颜色校正
-  const bitmap = await createImageBitmap(blob, { colorSpaceConversion: 'none' });
-  gl.activeTexture(gl.TEXTURE0 + unit);
-  gl.bindTexture(gl.TEXTURE_2D, gl.createTexture());
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, bitmap);
-  // 生成 mipmap，贴图缩小的时候，显卡会在不同大小的贴图之间插值，避免出现摩尔纹
-  gl.generateMipmap(gl.TEXTURE_2D);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
-  gl.uniform1i(gl.getUniformLocation(program, name), unit);
-}
-
-await loadTexture('/obj/african_head/african_head_diffuse.png', 0, 'uDiffuse');
-await loadTexture('/obj/african_head/african_head_nm_tangent.png', 1, 'uNormalMap');
-await loadTexture('/obj/african_head/african_head_spec.png', 2, 'uSpecular');
-
-// 把一个矩阵传给着色器：OpenGL 的矩阵是按列存的，我们的矩阵是按行存的，
-// 所以第二个参数要传 true，让 WebGL 帮我们转置一下
-function setMatrix(name: string, m: Mat) {
-  gl.uniformMatrix4fv(gl.getUniformLocation(program, name), true, m.flat());
-}
-
-// 深度测试：对应我们自己写的 zbuffer
-gl.enable(gl.DEPTH_TEST);
-// 视口变换：对应我们的 Viewport 矩阵
-gl.viewport(0, 0, canvas.width, canvas.height);
-
-// 两个渲染器共用的 uniform
+// 两个渲染器共用的 uniform；CPU 端的矩阵仍然按行保存
 export type Uniforms = {
   ModelView: Mat;
-  ModelViewIT: Mat; // ModelView 的逆转置矩阵，用来变换法线
+  ModelViewIT: Mat;
   Projection: Mat;
   light: Vec3; // 相机坐标系下，指向光源的方向
 };
 
-const light: Vec3 = [1, 1, 1]; // 指向光源的方向
+// 初始化显卡资源，返回一个“用这份 uniform 画一帧”的函数
+async function createWebGPURenderer(canvas: HTMLCanvasElement, onError: (message: string) => void) {
+  if (!navigator.gpu) {
+    throw new Error(
+      '当前浏览器无法使用 WebGPU，请使用支持 WebGPU 的浏览器，并通过 localhost 或 HTTPS 打开。',
+    );
+  }
+  // adapter 代表可用的 GPU，device 用来创建缓冲、贴图、管线并提交绘图命令
+  const adapter = await navigator.gpu.requestAdapter();
+  if (!adapter) throw new Error('没有找到可用的 WebGPU 设备。');
+  const device = await adapter.requestDevice();
+  device.lost.then(info => {
+    console.error(info.message);
+    onError('WebGPU 设备已断开，请刷新页面重试。');
+  });
+  device.addEventListener('uncapturederror', event => {
+    console.error(event.error.message);
+    onError('WebGPU 渲染出错，请查看控制台。');
+  });
+  const context = canvas.getContext('webgpu');
+  if (!context) throw new Error('无法创建 WebGPU 画布。');
+  const format = navigator.gpu.getPreferredCanvasFormat();
+  context.configure({ device, format, alphaMode: 'opaque' });
 
-// 相机在一个球面上绕着模型转：theta 是绕 y 轴转的角度，phi 是抬头的角度，
-// 初始值对应的就是 day8 的相机位置 (1, 1, 3)
+  const model = await loadModel('/obj/african_head/african_head.obj');
+  // obj 的位置、uv、法线各有自己的索引；展开后，每个顶点连续存 3 + 3 + 2 个数
+  const vertices: number[] = [];
+  for (let i = 0; i < model.nfaces(); i++) {
+    for (let j = 0; j < 3; j++) {
+      vertices.push(...model.vert(i, j), ...model.normal(i, j), ...model.uv(i, j));
+    }
+  }
+  const vertexData = new Float32Array(vertices);
+  const vertexBuffer = device.createBuffer({
+    label: '位置、法线、uv',
+    size: vertexData.byteLength,
+    usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+  });
+  device.queue.writeBuffer(vertexBuffer, 0, vertexData);
+
+  // 三个 mat4 各占 16 个 float，光照方向用一个 vec4，共 52 × 4 = 208 字节
+  const uniformData = new Float32Array(52);
+  const uniformBuffer = device.createBuffer({
+    label: '相机和光照',
+    size: uniformData.byteLength,
+    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+  });
+
+  // WebGPU 没有 generateMipmap()：加载时用浏览器缩图，逐层上传，绘制时再插值
+  async function loadTexture(url: string) {
+    const blob = await (await fetch(url)).blob();
+    const bitmap = await createImageBitmap(blob, { colorSpaceConversion: 'none' });
+    const mipLevelCount = Math.floor(Math.log2(Math.max(bitmap.width, bitmap.height))) + 1;
+    const texture = device.createTexture({
+      label: url,
+      size: [bitmap.width, bitmap.height],
+      mipLevelCount,
+      // 用普通 unorm，避免把法线、高光等数据贴图当成 sRGB 颜色自动解码
+      format: 'rgba8unorm',
+      usage:
+        GPUTextureUsage.TEXTURE_BINDING |
+        GPUTextureUsage.COPY_DST |
+        GPUTextureUsage.RENDER_ATTACHMENT,
+    });
+    for (let level = 0; level < mipLevelCount; level++) {
+      const width = Math.max(1, bitmap.width >> level);
+      const height = Math.max(1, bitmap.height >> level);
+      const image =
+        level === 0
+          ? bitmap
+          : await createImageBitmap(bitmap, {
+              resizeWidth: width,
+              resizeHeight: height,
+              resizeQuality: 'high',
+              colorSpaceConversion: 'none',
+            });
+      device.queue.copyExternalImageToTexture({ source: image }, { texture, mipLevel: level }, [
+        width,
+        height,
+      ]);
+      if (image !== bitmap) image.close();
+    }
+    bitmap.close();
+    return texture.createView();
+  }
+  const diffuse = await loadTexture('/obj/african_head/african_head_diffuse.png');
+  const normal = await loadTexture('/obj/african_head/african_head_nm_tangent.png');
+  const specular = await loadTexture('/obj/african_head/african_head_spec.png');
+  const sampler = device.createSampler({
+    magFilter: 'linear',
+    minFilter: 'linear',
+    mipmapFilter: 'linear',
+    addressModeU: 'repeat',
+    addressModeV: 'repeat',
+  });
+
+  // Before：WebGL 的渲染状态分散在多次 API 调用里
+  // After：WebGPU 用一个 pipeline 明确声明着色器、顶点布局、图元和深度测试
+  const module = device.createShaderModule({ label: 'Phong 光照', code: shaderSource });
+  const pipeline = await device.createRenderPipelineAsync({
+    layout: 'auto',
+    vertex: {
+      module,
+      entryPoint: 'vertexMain',
+      buffers: [
+        {
+          arrayStride: 8 * 4, // 每个顶点占 8 个 float，每个 float 占 4 字节
+          attributes: [
+            { shaderLocation: 0, offset: 0, format: 'float32x3' },
+            { shaderLocation: 1, offset: 3 * 4, format: 'float32x3' },
+            { shaderLocation: 2, offset: 6 * 4, format: 'float32x2' },
+          ],
+        },
+      ],
+    },
+    fragment: { module, entryPoint: 'fragmentMain', targets: [{ format }] },
+    primitive: { topology: 'triangle-list', cullMode: 'none' },
+    depthStencil: { format: 'depth24plus', depthWriteEnabled: true, depthCompare: 'less' },
+  });
+  // 把实际资源和 WGSL 的 @binding 编号连接起来
+  const bindGroup = device.createBindGroup({
+    layout: pipeline.getBindGroupLayout(0),
+    entries: [
+      { binding: 0, resource: { buffer: uniformBuffer } },
+      { binding: 1, resource: sampler },
+      { binding: 2, resource: diffuse },
+      { binding: 3, resource: normal },
+      { binding: 4, resource: specular },
+    ],
+  });
+  // 对应软渲染器的 zbuffer，WebGPU 要显式创建深度贴图
+  const depthTexture = device.createTexture({
+    size: [canvas.width, canvas.height],
+    format: 'depth24plus',
+    usage: GPUTextureUsage.RENDER_ATTACHMENT,
+  });
+  const depthView = depthTexture.createView();
+
+  return (uniforms: Uniforms) => {
+    // WGSL 的矩阵按列存储；把 CPU 的行矩阵转置后再展开上传
+    uniformData.set(transpose(uniforms.ModelView).flat(), 0);
+    uniformData.set(transpose(uniforms.ModelViewIT).flat(), 16);
+    uniformData.set(transpose(uniforms.Projection).flat(), 32);
+    uniformData.set([...uniforms.light, 0], 48);
+    device.queue.writeBuffer(uniformBuffer, 0, uniformData);
+
+    // encoder 先记录一帧的命令，最后一次性提交给 GPU
+    const encoder = device.createCommandEncoder();
+    const pass = encoder.beginRenderPass({
+      colorAttachments: [
+        {
+          view: context.getCurrentTexture().createView(),
+          clearValue: [0, 0, 0, 1],
+          loadOp: 'clear',
+          storeOp: 'store',
+        },
+      ],
+      depthStencilAttachment: {
+        view: depthView,
+        depthClearValue: 1,
+        depthLoadOp: 'clear',
+        depthStoreOp: 'store',
+      },
+    });
+    pass.setPipeline(pipeline);
+    pass.setBindGroup(0, bindGroup);
+    pass.setVertexBuffer(0, vertexBuffer);
+    pass.draw(model.nfaces() * 3);
+    pass.end();
+    device.queue.submit([encoder.finish()]);
+  };
+}
+
+const canvas = document.querySelector<HTMLCanvasElement>('#webgpu')!;
+const softwareCanvas = document.querySelector<HTMLCanvasElement>('#software')!;
+const fps = document.querySelector('#webgpu-fps')!;
+const status = document.querySelector<HTMLParagraphElement>('#gpu-status')!;
+let draw: ((uniforms: Uniforms) => void) | null = null;
+function showGPUError(message: string) {
+  draw = null;
+  fps.textContent = '不可用';
+  status.textContent = message;
+  status.hidden = false;
+}
+
+// 软渲染器在独立的 Worker 里跑，WebGPU 不可用时也能继续展示 CPU 端的结果
+const offscreen = softwareCanvas.transferControlToOffscreen();
+const worker = new Worker('/extra-webgl/software.ts', { type: 'module' });
+worker.postMessage({ canvas: offscreen }, [offscreen]);
+worker.onmessage = e => {
+  document.querySelector('#software-fps')!.textContent = `${e.data.fps.toFixed(1)} FPS`;
+};
+
+const light: Vec3 = [1, 1, 1];
+// 相机在球面上绕模型转，初始位置仍然是 (1, 1, 3)
 const distance = Math.sqrt(11);
 let theta = Math.atan2(1, 3);
 let phi = Math.asin(1 / distance);
-
-// 根据相机现在的位置，算出两个渲染器共用的 uniform
 function createUniforms(): Uniforms {
   const eye: Vec3 = [
     distance * Math.cos(phi) * Math.sin(theta),
@@ -189,40 +299,13 @@ function createUniforms(): Uniforms {
     ModelView,
     ModelViewIT: transpose(inverse(ModelView)),
     Projection: perspective(Math.PI / 4, canvas.width / canvas.height, 0.1, 100),
-    // 光照方向是一个向量，变换到相机坐标系时 w 取 0
     light: transformDirection(ModelView, light),
   };
 }
-
-// WebGL：把 uniform 传给着色器，然后画出来
-function draw(uniforms: Uniforms) {
-  setMatrix('uModelView', uniforms.ModelView);
-  setMatrix('uModelViewIT', uniforms.ModelViewIT);
-  setMatrix('uProjection', uniforms.Projection);
-  gl.uniform3fv(gl.getUniformLocation(program, 'uLight'), uniforms.light);
-
-  // 清空颜色和深度，对应 frame.clear() 和 zbuffer.fill(Infinity)
-  gl.clearColor(0, 0, 0, 1);
-  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-  // 每三个顶点画一个三角形
-  gl.drawArrays(gl.TRIANGLES, 0, model.nfaces() * 3);
-}
-
-// 软渲染器放在 Web Worker 里跑：把左边那块 canvas 的控制权交给 worker
-const softwareCanvas = document.querySelector<HTMLCanvasElement>('#software')!;
-const offscreen = softwareCanvas.transferControlToOffscreen();
-const worker = new Worker('/extra-webgl/software.ts', { type: 'module' });
-worker.postMessage({ canvas: offscreen }, [offscreen]);
-// worker 会定期发来它的实际渲染帧率
-worker.onmessage = e => {
-  document.querySelector('#software-fps')!.textContent = `${e.data.fps.toFixed(1)} FPS`;
-};
-
-// 一开始先算一份 uniform，WebGL 自己用，再发一份给 worker
 let uniforms = createUniforms();
 worker.postMessage({ uniforms });
 
-// 在任意一块画布上按住鼠标拖动，两边的相机一起转
+// 在任意画布上拖动，两边共用同一份相机和光照
 let dragging = false;
 for (const c of [canvas, softwareCanvas]) {
   c.addEventListener('pointerdown', () => (dragging = true));
@@ -231,18 +314,16 @@ window.addEventListener('pointerup', () => (dragging = false));
 window.addEventListener('pointermove', e => {
   if (!dragging) return;
   theta -= e.movementX * 0.01;
-  // 抬头的角度不能超过 90°，不然相机就翻过去了
   phi = Math.max(-1.5, Math.min(1.5, phi + e.movementY * 0.01));
-  // 相机动了，重新算一遍 uniform，再发一份给 worker
   uniforms = createUniforms();
   worker.postMessage({ uniforms });
 });
 
-// WebGL 这边不停地重画，每 250 毫秒用这段时间内的实际帧数更新 FPS
-const fps = document.querySelector('#webgl-fps')!;
+// 统计浏览器实际调度的绘制帧数，每 250 毫秒更新；这不是 GPU 的极限吞吐量
 let frames = 0;
-let last = performance.now();
+let last = 0;
 function loop() {
+  if (!draw) return;
   draw(uniforms);
   frames++;
   const now = performance.now();
@@ -253,4 +334,11 @@ function loop() {
   }
   requestAnimationFrame(loop);
 }
-loop();
+try {
+  draw = await createWebGPURenderer(canvas, showGPUError);
+  last = performance.now();
+  requestAnimationFrame(loop);
+} catch (error) {
+  console.error(error);
+  showGPUError(error instanceof Error ? error.message : 'WebGPU 初始化失败。');
+}

@@ -1,7 +1,7 @@
 /**
- * 软渲染器：和 main.ts 里的 WebGL 画同一个人头，放在 Web Worker 里跑
+ * 软渲染器：和 main.ts 里的 WebGPU 画同一个人头，放在 Web Worker 里跑
  *
- * 软渲染器画一帧要一百多毫秒，要是和 WebGL 挤在同一个线程里，WebGL 也会被拖慢，就没法比较帧率了
+ * 软渲染器在 CPU 上逐像素计算，放在独立线程里，避免阻塞 WebGPU 的绘图和鼠标交互
  */
 import { Color, Frame } from './frame';
 import { IShader, triangle, viewport } from './gl';
@@ -44,7 +44,7 @@ function sampleNormal(texture: Texture, uv: Vec2): Vec3 {
   return normalize([(r / 255) * 2 - 1, (g / 255) * 2 - 1, (b / 255) * 2 - 1]);
 }
 
-// 和 WebGL 的着色器做一样的事：切线空间的法线贴图 + Phong 光照，基本就是 day8 的 TangentShader
+// 和 WGSL 着色器做一样的事：切线空间的法线贴图 + Phong 光照，基本就是 day8 的 TangentShader
 class PhongShader implements IShader {
   uniforms: Uniforms;
   varyingUV: Vec2[] = [

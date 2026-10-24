@@ -9,11 +9,15 @@
 先安装 [Bun](https://bun.sh/)，然后：
 
 ```bash
-bun install   # 只装了 Bun 的类型声明，渲染器本身不依赖任何第三方库
+bun install   # 只安装类型声明，渲染器不依赖第三方运行库
 bun dev
 ```
 
 打开 http://localhost:8080 就能看到每一天的渲染结果。
+
+GPU 番外的 [代码](days/extra-webgl) 已升级为 [WebGPU](https://developer.mozilla.org/en-US/docs/Web/API/WebGPU_API)，目录和教程链接沿用原来的名字。
+使用支持 WebGPU 的浏览器，通过 localhost 或 HTTPS 打开，即可对比 CPU 软渲染与 GPU 渲染的实时帧率。
+代码中用 [WGSL](https://www.w3.org/TR/WGSL/) 对照 TypeScript 着色器，并注释了资源绑定、矩阵上传和深度范围的区别。
 
 ## 目录结构
 
