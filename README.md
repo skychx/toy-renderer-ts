@@ -48,6 +48,7 @@ diff -r days/day04 days/day05
 | [day10：环境光遮蔽](https://supercodepower.com/docs/toy-renderer/day10-Ambient-occlusion)                   | [days/day10](days/day10)                         |
 | [番外：透视校正插值](https://supercodepower.com/docs/toy-renderer/extra1-Perspective-correct-interpolation) | [days/extra-perspective](days/extra-perspective) |
 | [番外：卡通渲染](https://supercodepower.com/docs/toy-renderer/extra2-Toon-shading)                          | [days/extra-toon](days/extra-toon)               |
+| [番外：用 WebGL 重写一遍](https://supercodepower.com/docs/toy-renderer/extra3-WebGL)                        | [days/extra-webgl](days/extra-webgl)             |
 
 ## 致谢
 
