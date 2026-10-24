@@ -22,15 +22,10 @@ export class Frame {
 
   // 用一种颜色填满整个画布
   clear(color: Color) {
-    // Before：逐像素调用 set()，反复做取整、越界检查和 y 轴翻转
-    // After：清屏时所有像素颜色相同，直接按 RGBA 顺序写满数组即可
-    const data = this.imageData.data;
-    const [r, g, b] = color;
-    for (let i = 0; i < data.length; i += 4) {
-      data[i] = r;
-      data[i + 1] = g;
-      data[i + 2] = b;
-      data[i + 3] = 255; // 清屏也保持不透明，不能把 alpha 一起清成 0
+    for (let y = 0; y < this.height; y++) {
+      for (let x = 0; x < this.width; x++) {
+        this.set(x, y, color);
+      }
     }
   }
 
