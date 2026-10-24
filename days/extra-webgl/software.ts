@@ -141,19 +141,22 @@ function render(canvas: OffscreenCanvas, uniforms: Uniforms) {
   canvas.getContext('2d')!.putImageData(frame.imageData, 0, 0);
 }
 
-// 画完一帧马上接着画下一帧，每秒把帧率告诉主线程一次
+// 画完一帧马上接着画下一帧，累计至少 250 毫秒后把帧率告诉主线程
+// 如果一帧本身就超过 250 毫秒，就在这一帧完成后更新
 let frames = 0;
-let last = performance.now();
+let last: number | null = null;
 function loop() {
   if (canvas && uniforms) {
+    // 从真正开始渲染时计时，避免把等待画布和 uniform 的时间算进去
+    last ??= performance.now();
     render(canvas, uniforms);
     frames++;
-  }
-  const now = performance.now();
-  if (now - last >= 1000) {
-    postMessage({ fps: Math.round((frames * 1000) / (now - last)) });
-    frames = 0;
-    last = now;
+    const now = performance.now();
+    if (now - last >= 250) {
+      postMessage({ fps: (frames * 1000) / (now - last) });
+      frames = 0;
+      last = now;
+    }
   }
   setTimeout(loop);
 }

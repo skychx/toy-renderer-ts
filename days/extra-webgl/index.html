@@ -18,6 +18,21 @@
         /* 两块画布要并排放得下，才方便比较 */
         width: min(800px, 44vw);
       }
+      figcaption {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-top: 8px;
+      }
+      .fps {
+        padding: 4px 8px;
+        border-radius: 4px;
+        background: #e8f5e9;
+        color: #1b5e20;
+        font: bold 14px monospace;
+        min-width: 9ch;
+        text-align: right;
+      }
     </style>
   </head>
   <body>
@@ -25,11 +40,11 @@
     <p>在任意一块画布上按住鼠标拖动，可以从不同的角度看模型，两边的相机是同步的</p>
     <figure>
       <canvas id="software" width="800" height="800"></canvas>
-      <figcaption>软渲染器（canvas）<span id="software-fps"></span></figcaption>
+      <figcaption>软渲染器（canvas）<span id="software-fps" class="fps">-- FPS</span></figcaption>
     </figure>
     <figure>
       <canvas id="webgl" width="800" height="800"></canvas>
-      <figcaption>WebGL <span id="webgl-fps"></span></figcaption>
+      <figcaption>WebGL <span id="webgl-fps" class="fps">-- FPS</span></figcaption>
     </figure>
     <script type="module" src="./main.ts"></script>
   </body>

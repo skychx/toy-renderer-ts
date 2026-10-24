@@ -213,9 +213,9 @@ const softwareCanvas = document.querySelector<HTMLCanvasElement>('#software')!;
 const offscreen = softwareCanvas.transferControlToOffscreen();
 const worker = new Worker('/extra-webgl/software.ts', { type: 'module' });
 worker.postMessage({ canvas: offscreen }, [offscreen]);
-// worker 每秒会发来一次它的帧率
+// worker 会定期发来它的实际渲染帧率
 worker.onmessage = e => {
-  document.querySelector('#software-fps')!.textContent = `${e.data.fps} FPS`;
+  document.querySelector('#software-fps')!.textContent = `${e.data.fps.toFixed(1)} FPS`;
 };
 
 // 一开始先算一份 uniform，WebGL 自己用，再发一份给 worker
@@ -238,7 +238,7 @@ window.addEventListener('pointermove', e => {
   worker.postMessage({ uniforms });
 });
 
-// WebGL 这边不停地重画，顺便统计一下每秒能画多少帧
+// WebGL 这边不停地重画，每 250 毫秒用这段时间内的实际帧数更新 FPS
 const fps = document.querySelector('#webgl-fps')!;
 let frames = 0;
 let last = performance.now();
@@ -246,8 +246,8 @@ function loop() {
   draw(uniforms);
   frames++;
   const now = performance.now();
-  if (now - last >= 1000) {
-    fps.textContent = `${Math.round((frames * 1000) / (now - last))} FPS`;
+  if (now - last >= 250) {
+    fps.textContent = `${((frames * 1000) / (now - last)).toFixed(1)} FPS`;
     frames = 0;
     last = now;
   }
