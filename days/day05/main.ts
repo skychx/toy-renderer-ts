@@ -73,7 +73,9 @@ function world2screen(v: Vec3): Vec3 {
 
 // 计算三角形的光照强度
 function lightIntensity(worldCoords: Vec3[]) {
-  const n = normalize(cross(sub(worldCoords[2], worldCoords[0]), sub(worldCoords[1], worldCoords[0])));
+  const n = normalize(
+    cross(sub(worldCoords[2], worldCoords[0]), sub(worldCoords[1], worldCoords[0])),
+  );
   return dot(n, lightDir);
 }
 
@@ -100,7 +102,12 @@ function perspMatrix(v: Vec3): Vec3 {
 }
 
 // 渲染一个带纹理的模型，project 决定了每个顶点怎么投影
-function render(model: Model, texture: Texture, canvas: HTMLCanvasElement, project: (v: Vec3) => Vec3) {
+function render(
+  model: Model,
+  texture: Texture,
+  canvas: HTMLCanvasElement,
+  project: (v: Vec3) => Vec3,
+) {
   const frame = new Frame(width, height);
   const zbuffer = new Float32Array(width * height).fill(-Infinity);
 
@@ -132,4 +139,3 @@ const texture = await loadTexture('/obj/african_head/african_head_diffuse.png');
 render(model, texture, document.querySelector<HTMLCanvasElement>('#ortho')!, ortho);
 render(model, texture, document.querySelector<HTMLCanvasElement>('#persp')!, persp);
 render(model, texture, document.querySelector<HTMLCanvasElement>('#persp-matrix')!, perspMatrix);
-

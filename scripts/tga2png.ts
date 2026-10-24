@@ -26,7 +26,11 @@ function readTGA(buf: Uint8Array): Image {
   const bytesPerPixel = buf[16] / 8;
   const topDown = (buf[17] & 0x20) !== 0; // 像素是不是从上往下存的
 
-  if (colorMapType !== 0 || ![2, 3, 10, 11].includes(imageType) || ![1, 3, 4].includes(bytesPerPixel)) {
+  if (
+    colorMapType !== 0 ||
+    ![2, 3, 10, 11].includes(imageType) ||
+    ![1, 3, 4].includes(bytesPerPixel)
+  ) {
     throw new Error(`不支持的 tga 格式：type=${imageType} bpp=${buf[16]}`);
   }
 
@@ -100,7 +104,8 @@ function filterRows({ width, height, channels, pixels }: Image) {
 
   for (let y = 0; y < height; y++) {
     const row = pixels.subarray(y * rowBytes, (y + 1) * rowBytes);
-    const prev = y > 0 ? pixels.subarray((y - 1) * rowBytes, y * rowBytes) : new Uint8Array(rowBytes);
+    const prev =
+      y > 0 ? pixels.subarray((y - 1) * rowBytes, y * rowBytes) : new Uint8Array(rowBytes);
     let bestType = 0;
     let bestScore = Infinity;
     let best = new Uint8Array(row);

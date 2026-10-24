@@ -1,0 +1,8 @@
+# bun fmt 的配置，选项名和 Prettier 一样：https://bun.com/docs/format
+[fmt]
+tabWidth = 2
+useTabs = false
+printWidth = 100
+singleQuote = true
+# 箭头函数只有一个参数时不加括号：p => p[0]
+arrowParens = "avoid"

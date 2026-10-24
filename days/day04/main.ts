@@ -103,7 +103,9 @@ function world2screen(v: Vec3): Vec3 {
 // 计算三角形的光照强度
 function lightIntensity(worldCoords: Vec3[]) {
   // 计算世界坐标中某个三角形的法线（法线 = 三角形任意两条边做叉乘），然后做归一化
-  const n = normalize(cross(sub(worldCoords[2], worldCoords[0]), sub(worldCoords[1], worldCoords[0])));
+  const n = normalize(
+    cross(sub(worldCoords[2], worldCoords[0]), sub(worldCoords[1], worldCoords[0])),
+  );
 
   // 三角形法线和光照方向做点乘，点乘值大于 0，说明法线方向和光照方向在同一侧
   // 值越大，说明越多的光照射到三角形上，颜色越白

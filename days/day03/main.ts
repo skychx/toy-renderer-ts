@@ -73,7 +73,11 @@ function triangle(pts: Vec2[], frame: Frame, color: Color) {
 // 用叉乘画一个三角形
 function drawCrossProductTriangle(canvas: HTMLCanvasElement) {
   const frame = new Frame(200, 200);
-  const pts: Vec2[] = [[10, 10], [150, 30], [70, 160]];
+  const pts: Vec2[] = [
+    [10, 10],
+    [150, 30],
+    [70, 160],
+  ];
 
   // 遍历图片中的所有像素
   for (let x = 0; x < frame.width; x++) {
@@ -94,7 +98,15 @@ function drawCrossProductTriangle(canvas: HTMLCanvasElement) {
 // 用重心坐标画一个三角形
 function drawBarycentricTriangle(canvas: HTMLCanvasElement) {
   const frame = new Frame(200, 200);
-  triangle([[10, 10], [150, 30], [70, 160]], frame, red);
+  triangle(
+    [
+      [10, 10],
+      [150, 30],
+      [70, 160],
+    ],
+    frame,
+    red,
+  );
   frame.render(canvas);
 }
 
@@ -108,7 +120,10 @@ async function drawRandomColorModel(canvas: HTMLCanvasElement) {
     const screenCoords: Vec2[] = [];
     for (let j = 0; j < 3; j++) {
       const v = model.vert(face[j]);
-      screenCoords.push([Math.floor(((v[0] + 1) * width) / 2), Math.floor(((v[1] + 1) * height) / 2)]);
+      screenCoords.push([
+        Math.floor(((v[0] + 1) * width) / 2),
+        Math.floor(((v[1] + 1) * height) / 2),
+      ]);
     }
 
     const randomColor: Color = [Math.random() * 255, Math.random() * 255, Math.random() * 255];
@@ -133,12 +148,17 @@ async function drawLightModel(canvas: HTMLCanvasElement) {
     for (let j = 0; j < 3; j++) {
       const v = model.vert(face[j]);
       // 投影为正交投影，而且只做了个简单的视口变换
-      screenCoords.push([Math.floor(((v[0] + 1) * width) / 2), Math.floor(((v[1] + 1) * height) / 2)]);
+      screenCoords.push([
+        Math.floor(((v[0] + 1) * width) / 2),
+        Math.floor(((v[1] + 1) * height) / 2),
+      ]);
       worldCoords.push(v);
     }
 
     // 计算世界坐标中某个三角形的法线（法线 = 三角形任意两条边做叉乘），然后做归一化
-    const n = normalize(cross(sub(worldCoords[2], worldCoords[0]), sub(worldCoords[1], worldCoords[0])));
+    const n = normalize(
+      cross(sub(worldCoords[2], worldCoords[0]), sub(worldCoords[1], worldCoords[0])),
+    );
 
     // 三角形法线和光照方向做点乘，点乘值大于 0，说明法线方向和光照方向在同一侧
     // 值越大，说明越多的光照射到三角形上，颜色越白
