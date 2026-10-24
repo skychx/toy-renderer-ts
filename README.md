@@ -42,6 +42,7 @@ diff -r days/day04 days/day05
 | [day4：Z-buffering](https://supercodepower.com/docs/toy-renderer/day4-Z-buffering)         | [days/day04](days/day04) |
 | [day5：透视投影](https://supercodepower.com/docs/toy-renderer/day5-Perspective-projection) | [days/day05](days/day05) |
 | [day6：移动相机](https://supercodepower.com/docs/toy-renderer/day6-Moving-the-camera)      | [days/day06](days/day06) |
+| [day7：着色器](https://supercodepower.com/docs/toy-renderer/day7-Shaders)                  | [days/day07](days/day07) |
 
 ## 致谢
 
