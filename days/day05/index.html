@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>day5：透视投影</title>
+    <style>
+      body { margin: 24px; font-family: sans-serif; }
+      figure { display: inline-block; margin: 0 24px 24px 0; vertical-align: top; }
+      canvas { border: 1px solid #ddd; }
+    </style>
+  </head>
+  <body>
+    <h1>day5：透视投影</h1>
+    <figure>
+      <canvas id="ortho"></canvas>
+      <figcaption>正交投影</figcaption>
+    </figure>
+    <figure>
+      <canvas id="persp"></canvas>
+      <figcaption>透视投影（直接套相似三角形的公式）</figcaption>
+    </figure>
+    <figure>
+      <canvas id="persp-matrix"></canvas>
+      <figcaption>透视投影（用投影矩阵）</figcaption>
+    </figure>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
