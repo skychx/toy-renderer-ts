@@ -15,15 +15,21 @@
       }
       canvas {
         border: 1px solid #ddd;
+        /* 两块画布要并排放得下，才方便比较 */
+        width: min(800px, 44vw);
       }
     </style>
   </head>
   <body>
     <h1>番外：用 WebGL 重写一遍</h1>
-    <p>按住鼠标拖动，可以从不同的角度看模型 <span id="fps"></span></p>
+    <p>在任意一块画布上按住鼠标拖动，可以从不同的角度看模型，两边的相机是同步的</p>
+    <figure>
+      <canvas id="software" width="800" height="800"></canvas>
+      <figcaption>软渲染器（canvas）<span id="software-fps"></span></figcaption>
+    </figure>
     <figure>
       <canvas id="webgl" width="800" height="800"></canvas>
-      <figcaption>WebGL：切线空间的法线贴图 + Phong 光照</figcaption>
+      <figcaption>WebGL <span id="webgl-fps"></span></figcaption>
     </figure>
     <script type="module" src="./main.ts"></script>
   </body>

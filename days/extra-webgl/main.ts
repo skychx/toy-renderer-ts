@@ -1,4 +1,5 @@
-import { Mat, Vec3, Vec4, cross, inverse, matMul, matVec, normalize, sub, transpose } from './math';
+import { lookAt, perspective } from './gl';
+import { Mat, Vec3, inverse, transformDirection, transpose } from './math';
 import { loadModel } from './model';
 
 // 顶点着色器：对应 IShader 的 vertex()
@@ -77,49 +78,6 @@ void main() {
   fragColor = vec4(color * (ambient + diffuse) + specular, 1.0);
 }
 `;
-
-// 视图矩阵：和 gl.ts 里的 lookAt 只差了平移这一步
-function lookAt(eye: Vec3, center: Vec3, up: Vec3): Mat {
-  // 相机坐标系的三个轴在世界坐标系里的方向
-  const zAxis = normalize(sub(eye, center)); // z 轴：从 center 指向 eye
-  const xAxis = normalize(cross(up, zAxis)); // x 轴：同时垂直于 up 和 z 轴
-  const yAxis = normalize(cross(zAxis, xAxis)); // y 轴：同时垂直于 z 轴和 x 轴
-
-  // 旋转：把三个轴按行放进矩阵
-  const rotation: Mat = [
-    [xAxis[0], xAxis[1], xAxis[2], 0],
-    [yAxis[0], yAxis[1], yAxis[2], 0],
-    [zAxis[0], zAxis[1], zAxis[2], 0],
-    [0, 0, 0, 1],
-  ];
-  // 平移：OpenGL 的相机放在原点，所以要把 eye 移到原点（gl.ts 里移的是 center）
-  const translation: Mat = [
-    [1, 0, 0, -eye[0]],
-    [0, 1, 0, -eye[1]],
-    [0, 0, 1, -eye[2]],
-    [0, 0, 0, 1],
-  ];
-  // 先平移，再旋转
-  return matMul(rotation, translation);
-}
-
-// 透视投影矩阵：fovy 是上下方向的视角，aspect 是画面的宽高比，
-// near、far 是近平面和远平面到相机的距离，只有这两个平面之间的东西才会被画出来
-function perspective(fovy: number, aspect: number, near: number, far: number): Mat {
-  const f = 1 / Math.tan(fovy / 2);
-  return [
-    [f / aspect, 0, 0, 0],
-    [0, f, 0, 0],
-    [0, 0, (far + near) / (near - far), (2 * far * near) / (near - far)],
-    [0, 0, -1, 0],
-  ];
-}
-
-// 用 4x4 矩阵变换一个向量：向量的 w 是 0，平移对它不起作用
-function transformDirection(m: Mat, v: Vec3): Vec3 {
-  const [x, y, z] = matVec(m, [v[0], v[1], v[2], 0] as Vec4);
-  return [x, y, z];
-}
 
 const canvas = document.querySelector<HTMLCanvasElement>('#webgl')!;
 const gl = canvas.getContext('webgl2')!;
@@ -203,6 +161,14 @@ gl.enable(gl.DEPTH_TEST);
 // 视口变换：对应我们的 Viewport 矩阵
 gl.viewport(0, 0, canvas.width, canvas.height);
 
+// 两个渲染器共用的 uniform
+export type Uniforms = {
+  ModelView: Mat;
+  ModelViewIT: Mat; // ModelView 的逆转置矩阵，用来变换法线
+  Projection: Mat;
+  light: Vec3; // 相机坐标系下，指向光源的方向
+};
+
 const light: Vec3 = [1, 1, 1]; // 指向光源的方向
 
 // 相机在一个球面上绕着模型转：theta 是绕 y 轴转的角度，phi 是抬头的角度，
@@ -211,42 +177,73 @@ const distance = Math.sqrt(11);
 let theta = Math.atan2(1, 3);
 let phi = Math.asin(1 / distance);
 
-function draw() {
+// 根据相机现在的位置，算出两个渲染器共用的 uniform
+function createUniforms(): Uniforms {
   const eye: Vec3 = [
     distance * Math.cos(phi) * Math.sin(theta),
     distance * Math.sin(phi),
     distance * Math.cos(phi) * Math.cos(theta),
   ];
   const ModelView = lookAt(eye, [0, 0, 0], [0, 1, 0]);
-  setMatrix('uModelView', ModelView);
-  setMatrix('uModelViewIT', transpose(inverse(ModelView)));
-  setMatrix('uProjection', perspective(Math.PI / 4, canvas.width / canvas.height, 0.1, 100));
-  gl.uniform3fv(gl.getUniformLocation(program, 'uLight'), transformDirection(ModelView, light));
+  return {
+    ModelView,
+    ModelViewIT: transpose(inverse(ModelView)),
+    Projection: perspective(Math.PI / 4, canvas.width / canvas.height, 0.1, 100),
+    // 光照方向是一个向量，变换到相机坐标系时 w 取 0
+    light: transformDirection(ModelView, light),
+  };
+}
 
-  // 清空颜色和深度，对应 frame.clear() 和 zbuffer.fill(-Infinity)
+// WebGL：把 uniform 传给着色器，然后画出来
+function draw(uniforms: Uniforms) {
+  setMatrix('uModelView', uniforms.ModelView);
+  setMatrix('uModelViewIT', uniforms.ModelViewIT);
+  setMatrix('uProjection', uniforms.Projection);
+  gl.uniform3fv(gl.getUniformLocation(program, 'uLight'), uniforms.light);
+
+  // 清空颜色和深度，对应 frame.clear() 和 zbuffer.fill(Infinity)
   gl.clearColor(0, 0, 0, 1);
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
   // 每三个顶点画一个三角形
   gl.drawArrays(gl.TRIANGLES, 0, model.nfaces() * 3);
 }
 
-// 按住鼠标拖动，相机就跟着转
+// 软渲染器放在 Web Worker 里跑：把左边那块 canvas 的控制权交给 worker
+const softwareCanvas = document.querySelector<HTMLCanvasElement>('#software')!;
+const offscreen = softwareCanvas.transferControlToOffscreen();
+const worker = new Worker('/extra-webgl/software.ts', { type: 'module' });
+worker.postMessage({ canvas: offscreen }, [offscreen]);
+// worker 每秒会发来一次它的帧率
+worker.onmessage = e => {
+  document.querySelector('#software-fps')!.textContent = `${e.data.fps} FPS`;
+};
+
+// 一开始先算一份 uniform，WebGL 自己用，再发一份给 worker
+let uniforms = createUniforms();
+worker.postMessage({ uniforms });
+
+// 在任意一块画布上按住鼠标拖动，两边的相机一起转
 let dragging = false;
-canvas.addEventListener('pointerdown', () => (dragging = true));
+for (const c of [canvas, softwareCanvas]) {
+  c.addEventListener('pointerdown', () => (dragging = true));
+}
 window.addEventListener('pointerup', () => (dragging = false));
 window.addEventListener('pointermove', e => {
   if (!dragging) return;
   theta -= e.movementX * 0.01;
   // 抬头的角度不能超过 90°，不然相机就翻过去了
   phi = Math.max(-1.5, Math.min(1.5, phi + e.movementY * 0.01));
+  // 相机动了，重新算一遍 uniform，再发一份给 worker
+  uniforms = createUniforms();
+  worker.postMessage({ uniforms });
 });
 
-// 不停地重画，顺便统计一下每秒能画多少帧
-const fps = document.querySelector('#fps')!;
+// WebGL 这边不停地重画，顺便统计一下每秒能画多少帧
+const fps = document.querySelector('#webgl-fps')!;
 let frames = 0;
 let last = performance.now();
 function loop() {
-  draw();
+  draw(uniforms);
   frames++;
   const now = performance.now();
   if (now - last >= 1000) {

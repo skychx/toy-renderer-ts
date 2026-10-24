@@ -130,3 +130,9 @@ export function inverse(m: Mat): Mat {
   // 左边变成了单位矩阵，右边就是逆矩阵
   return a.map(row => row.slice(n));
 }
+
+// 用 4x4 矩阵变换一个向量：向量的 w 是 0，平移对它不起作用
+export function transformDirection(m: Mat, v: Vec3): Vec3 {
+  const [x, y, z] = matVec(m, [v[0], v[1], v[2], 0] as Vec4);
+  return [x, y, z];
+}
