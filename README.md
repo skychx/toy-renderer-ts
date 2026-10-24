@@ -45,6 +45,7 @@ diff -r days/day04 days/day05
 | [day7：着色器](https://supercodepower.com/docs/toy-renderer/day7-Shaders)                      | [days/day07](days/day07) |
 | [day8：Phong 光照与法线贴图](https://supercodepower.com/docs/toy-renderer/day8-Normal-mapping) | [days/day08](days/day08) |
 | [day9：阴影](https://supercodepower.com/docs/toy-renderer/day9-Shadow-mapping)                 | [days/day09](days/day09) |
+| [day10：环境光遮蔽](https://supercodepower.com/docs/toy-renderer/day10-Ambient-occlusion)      | [days/day10](days/day10) |
 
 ## 致谢
 
