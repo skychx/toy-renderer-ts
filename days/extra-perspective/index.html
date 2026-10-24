@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>番外：透视校正插值</title>
+    <style>
+      body {
+        margin: 24px;
+        font-family: sans-serif;
+      }
+      figure {
+        display: inline-block;
+        margin: 0 24px 24px 0;
+        vertical-align: top;
+      }
+      canvas {
+        border: 1px solid #ddd;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>番外：透视校正插值</h1>
+    <figure>
+      <canvas id="floor-affine"></canvas>
+      <figcaption>屏幕空间插值</figcaption>
+    </figure>
+    <figure>
+      <canvas id="floor-correct"></canvas>
+      <figcaption>透视校正插值</figcaption>
+    </figure>
+    <figure>
+      <canvas id="scene-affine"></canvas>
+      <figcaption>屏幕空间插值</figcaption>
+    </figure>
+    <figure>
+      <canvas id="scene-correct"></canvas>
+      <figcaption>透视校正插值</figcaption>
+    </figure>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

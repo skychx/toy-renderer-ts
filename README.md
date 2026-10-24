@@ -34,18 +34,19 @@ diff -r days/day04 days/day05
 
 ## 教程
 
-| 章节                                                                                           | 代码                     |
-| ---------------------------------------------------------------------------------------------- | ------------------------ |
-| [day1：环境搭建](https://supercodepower.com/docs/toy-renderer/day1-env-setup)                  | [days/day01](days/day01) |
-| [day2：画一条线](https://supercodepower.com/docs/toy-renderer/day2-draw-line)                  | [days/day02](days/day02) |
-| [day3：画一个三角形](https://supercodepower.com/docs/toy-renderer/day3-draw-triangle)          | [days/day03](days/day03) |
-| [day4：Z-buffering](https://supercodepower.com/docs/toy-renderer/day4-Z-buffering)             | [days/day04](days/day04) |
-| [day5：透视投影](https://supercodepower.com/docs/toy-renderer/day5-Perspective-projection)     | [days/day05](days/day05) |
-| [day6：移动相机](https://supercodepower.com/docs/toy-renderer/day6-Moving-the-camera)          | [days/day06](days/day06) |
-| [day7：着色器](https://supercodepower.com/docs/toy-renderer/day7-Shaders)                      | [days/day07](days/day07) |
-| [day8：Phong 光照与法线贴图](https://supercodepower.com/docs/toy-renderer/day8-Normal-mapping) | [days/day08](days/day08) |
-| [day9：阴影](https://supercodepower.com/docs/toy-renderer/day9-Shadow-mapping)                 | [days/day09](days/day09) |
-| [day10：环境光遮蔽](https://supercodepower.com/docs/toy-renderer/day10-Ambient-occlusion)      | [days/day10](days/day10) |
+| 章节                                                                                                        | 代码                                             |
+| ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| [day1：环境搭建](https://supercodepower.com/docs/toy-renderer/day1-env-setup)                               | [days/day01](days/day01)                         |
+| [day2：画一条线](https://supercodepower.com/docs/toy-renderer/day2-draw-line)                               | [days/day02](days/day02)                         |
+| [day3：画一个三角形](https://supercodepower.com/docs/toy-renderer/day3-draw-triangle)                       | [days/day03](days/day03)                         |
+| [day4：Z-buffering](https://supercodepower.com/docs/toy-renderer/day4-Z-buffering)                          | [days/day04](days/day04)                         |
+| [day5：透视投影](https://supercodepower.com/docs/toy-renderer/day5-Perspective-projection)                  | [days/day05](days/day05)                         |
+| [day6：移动相机](https://supercodepower.com/docs/toy-renderer/day6-Moving-the-camera)                       | [days/day06](days/day06)                         |
+| [day7：着色器](https://supercodepower.com/docs/toy-renderer/day7-Shaders)                                   | [days/day07](days/day07)                         |
+| [day8：Phong 光照与法线贴图](https://supercodepower.com/docs/toy-renderer/day8-Normal-mapping)              | [days/day08](days/day08)                         |
+| [day9：阴影](https://supercodepower.com/docs/toy-renderer/day9-Shadow-mapping)                              | [days/day09](days/day09)                         |
+| [day10：环境光遮蔽](https://supercodepower.com/docs/toy-renderer/day10-Ambient-occlusion)                   | [days/day10](days/day10)                         |
+| [番外：透视校正插值](https://supercodepower.com/docs/toy-renderer/extra1-Perspective-correct-interpolation) | [days/extra-perspective](days/extra-perspective) |
 
 ## 致谢
 
