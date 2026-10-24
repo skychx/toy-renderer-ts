@@ -139,12 +139,24 @@ class PhongShader implements IShader {
   }
 }
 
+let buffers: { frame: Frame; zbuffer: Float32Array } | null = null;
+
 // 画一帧：和前面每一天的 render 一样，只是最后画到了 OffscreenCanvas 上
 function render(canvas: OffscreenCanvas, uniforms: Uniforms) {
   const { width, height } = canvas;
-  const frame = new Frame(width, height);
+  // Before：每帧都分配新的 ImageData 和深度缓冲，800×800 时合计约 5.12 MB
+  // After：尺寸不变时复用两块缓冲，只清空内容；尺寸改变时才重新分配
+  if (!buffers || buffers.frame.width !== width || buffers.frame.height !== height) {
+    buffers = {
+      frame: new Frame(width, height), // 构造函数已经清为黑色
+      zbuffer: new Float32Array(width * height),
+    };
+  } else {
+    buffers.frame.clear([0, 0, 0]);
+  }
+  const { frame, zbuffer } = buffers;
   // OpenGL 里 z 越小离相机越近，所以 zbuffer 一开始要填成无穷远
-  const zbuffer = new Float32Array(width * height).fill(Infinity);
+  zbuffer.fill(Infinity);
   const Viewport = viewport(0, 0, width, height);
   const shader = new PhongShader(uniforms);
   for (let i = 0; i < model.nfaces(); i++) {
