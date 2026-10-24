@@ -19,14 +19,21 @@ const server = Bun.serve({
   port: 8080,
   routes,
   development: true,
-  // routes 没匹配上的请求都会走到这里：把 obj 目录下的模型和贴图原样返回
+  // routes 没匹配上的请求都会走到这里
   async fetch(req) {
     const path = decodeURIComponent(new URL(req.url).pathname);
+    // obj 目录下的模型和贴图，原样返回
     if (path.startsWith('/obj/')) {
       const file = Bun.file(`.${path}`);
       if (await file.exists()) {
         return new Response(file);
       }
+    }
+    // Web Worker 用的 TS 文件（比如 /extra-webgl/software.ts）：
+    // Bun 打包 html 的时候不会处理 new Worker()，所以在这里现场打包一下再返回
+    if (path.endsWith('.ts') && (await Bun.file(`./days${path}`).exists())) {
+      const { outputs } = await Bun.build({ entrypoints: [`./days${path}`] });
+      return new Response(outputs[0]);
     }
     return new Response('Not Found', { status: 404 });
   },
