@@ -41,10 +41,14 @@
   <body>
     <h1>番外：用 WebGPU 重写一遍</h1>
     <p>在任意一块画布上按住鼠标拖动，可以从不同的角度看模型，两边的相机是同步的</p>
+    <p>
+      左侧保留未优化的软渲染器；<a href="/extra-webgpu-optimized">查看优化版本</a>。两版分辨率均为
+      800×800。
+    </p>
     <p id="gpu-status" role="status" hidden></p>
     <figure>
       <canvas id="software" width="800" height="800"></canvas>
-      <figcaption>软渲染器（canvas）<span id="software-fps" class="fps">-- FPS</span></figcaption>
+      <figcaption>软渲染器（未优化）<span id="software-fps" class="fps">-- FPS</span></figcaption>
     </figure>
     <figure>
       <canvas id="webgpu" width="800" height="800"></canvas>

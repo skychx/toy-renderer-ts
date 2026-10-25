@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>番外：软渲染器性能优化</title>
+    <style>
+      body {
+        margin: 24px;
+        font-family: sans-serif;
+      }
+      figure {
+        display: inline-block;
+        margin: 0 24px 24px 0;
+        vertical-align: top;
+      }
+      canvas {
+        border: 1px solid #ddd;
+        /* 两块画布要并排放得下，才方便比较 */
+        width: min(800px, 44vw);
+      }
+      figcaption {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-top: 8px;
+      }
+      .fps {
+        padding: 4px 8px;
+        border-radius: 4px;
+        background: #e8f5e9;
+        color: #1b5e20;
+        font: bold 14px monospace;
+        min-width: 9ch;
+        text-align: right;
+      }
+      #gpu-status {
+        color: #b3261e;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>番外：软渲染器性能优化</h1>
+    <p>在任意一块画布上按住鼠标拖动，可以从不同的角度看模型，两边的相机是同步的</p>
+    <p>
+      左侧使用优化后的软渲染器；<a href="/extra-webgpu">查看未优化版本</a>。两版分辨率均为 800×800。
+    </p>
+    <p id="gpu-status" role="status" hidden></p>
+    <figure>
+      <canvas id="software" width="800" height="800"></canvas>
+      <figcaption>软渲染器（优化后）<span id="software-fps" class="fps">-- FPS</span></figcaption>
+    </figure>
+    <figure>
+      <canvas id="webgpu" width="800" height="800"></canvas>
+      <figcaption>WebGPU <span id="webgpu-fps" class="fps">-- FPS</span></figcaption>
+    </figure>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
