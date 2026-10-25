@@ -1,3 +1,4 @@
+import type { Demo } from '../../shared/demo';
 import { Frame, Color } from './frame';
 import { loadModel } from './model';
 
@@ -89,6 +90,22 @@ function drawLines(canvas: HTMLCanvasElement, drawLine: typeof line) {
   frame.render(canvas);
 }
 
+// 每个入口只绘制指定画布，供完整教程和单图 iframe 共用。
+export const demos: Record<string, Demo> = {
+  dda: {
+    title: 'DDA 直线算法',
+    width: 800,
+    height: 800,
+    run: canvas => drawLines(canvas, lineDDA),
+  },
+  bresenham: {
+    title: "Bresenham's 直线算法",
+    width: 800,
+    height: 800,
+    run: canvas => drawLines(canvas, line),
+  },
+  obj: { title: '模型线框', width: 800, height: 800, run: drawObj },
+};
 // 画出模型的线框
 async function drawObj(canvas: HTMLCanvasElement) {
   const model = await loadModel('/obj/african_head/african_head.obj');
@@ -117,7 +134,3 @@ async function drawObj(canvas: HTMLCanvasElement) {
 
   frame.render(canvas);
 }
-
-drawLines(document.querySelector<HTMLCanvasElement>('#dda')!, lineDDA);
-drawLines(document.querySelector<HTMLCanvasElement>('#bresenham')!, line);
-await drawObj(document.querySelector<HTMLCanvasElement>('#obj')!);

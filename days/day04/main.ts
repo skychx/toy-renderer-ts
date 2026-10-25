@@ -1,3 +1,4 @@
+import type { Demo } from '../../shared/demo';
 import { Frame, Color } from './frame';
 import { Vec2, Vec3, cross, dot, normalize, sub } from './math';
 import { loadModel } from './model';
@@ -139,7 +140,7 @@ function drawZBuffer(zbuffer: Float32Array, canvas: HTMLCanvasElement) {
 }
 
 // 用 zbuffer 画模型
-async function drawZBufferModel(canvas: HTMLCanvasElement, zbufferCanvas: HTMLCanvasElement) {
+async function createDepthResult() {
   const model = await loadModel('/obj/african_head/african_head.obj');
   const frame = new Frame(width, height);
   const zbuffer = createZBuffer();
@@ -166,8 +167,7 @@ async function drawZBufferModel(canvas: HTMLCanvasElement, zbufferCanvas: HTMLCa
     }
   }
 
-  frame.render(canvas);
-  drawZBuffer(zbuffer, zbufferCanvas);
+  return { frame, zbuffer };
 }
 
 // 给模型贴上纹理
@@ -199,8 +199,28 @@ async function drawTextureModel(canvas: HTMLCanvasElement) {
   frame.render(canvas);
 }
 
-await drawZBufferModel(
-  document.querySelector<HTMLCanvasElement>('#zbuffer-model')!,
-  document.querySelector<HTMLCanvasElement>('#zbuffer-image')!,
-);
-await drawTextureModel(document.querySelector<HTMLCanvasElement>('#texture')!);
+// 深度图与着色结果来自同一次光栅化；单独嵌入时不需要创建另一张画布。
+let depthResult: ReturnType<typeof createDepthResult> | undefined;
+function getDepthResult() {
+  return (depthResult ??= createDepthResult());
+}
+
+async function drawDepthModel(canvas: HTMLCanvasElement) {
+  (await getDepthResult()).frame.render(canvas);
+}
+
+async function drawDepthImage(canvas: HTMLCanvasElement) {
+  drawZBuffer((await getDepthResult()).zbuffer, canvas);
+}
+
+// 每个入口只绘制指定画布，供完整教程和单图 iframe 共用。
+export const demos: Record<string, Demo> = {
+  'zbuffer-model': {
+    title: '加入 zbuffer 后的渲染结果',
+    width: 800,
+    height: 800,
+    run: drawDepthModel,
+  },
+  'zbuffer-image': { title: 'zbuffer 画成的灰度图', width: 800, height: 800, run: drawDepthImage },
+  texture: { title: '纹理贴图', width: 800, height: 800, run: drawTextureModel },
+};

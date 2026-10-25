@@ -1,3 +1,4 @@
+import type { Demo } from '../../shared/demo';
 import { Frame, Color } from './frame';
 import { IShader, lookAt, projection, triangle, viewport } from './gl';
 import { Mat, Vec2, Vec3, Vec4, interpolate, length, matMul, matVec, sub } from './math';
@@ -62,25 +63,61 @@ function render(
   frame.render(canvas);
 }
 
-function getCanvas(id: string) {
-  return document.querySelector<HTMLCanvasElement>(`#${id}`)!;
+let floor: Promise<[Model, Texture]> | undefined;
+function getFloor() {
+  return (floor ??= Promise.all([
+    loadModel('/obj/floor.obj'),
+    loadTexture('/obj/floor_diffuse.png'),
+  ]));
 }
 
-const floor = await loadModel('/obj/floor.obj');
-const floorTexture = await loadTexture('/obj/floor_diffuse.png');
-const diablo = await loadModel('/obj/diablo3_pose/diablo3_pose.obj');
-const diabloTexture = await loadTexture('/obj/diablo3_pose/diablo3_pose_diffuse.png');
+let sceneItems: Promise<[Model, Texture][]> | undefined;
+function getScene() {
+  return (sceneItems ??= (async () => [
+    [
+      await loadModel('/obj/diablo3_pose/diablo3_pose.obj'),
+      await loadTexture('/obj/diablo3_pose/diablo3_pose_diffuse.png'),
+    ],
+    await getFloor(),
+  ])());
+}
 
 // 1. 贴着地板看过去：近处的格子很大，远处的格子很小，透视效果最明显
 const closeUp = cameraMatrix([0.4, -0.55, 1.6], [0, -1, -0.3]);
-render([[floor, floorTexture]], closeUp, getCanvas('floor-affine'), false);
-render([[floor, floorTexture]], closeUp, getCanvas('floor-correct'), true);
+async function drawFloor(canvas: HTMLCanvasElement, correct: boolean) {
+  render([await getFloor()], closeUp, canvas, correct);
+}
 
 // 2. day9、day10 的场景
 const scene = cameraMatrix([1, 1, 3], [0, 0, 0]);
-const items: [Model, Texture][] = [
-  [diablo, diabloTexture],
-  [floor, floorTexture],
-];
-render(items, scene, getCanvas('scene-affine'), false);
-render(items, scene, getCanvas('scene-correct'), true);
+async function drawScene(canvas: HTMLCanvasElement, correct: boolean) {
+  render(await getScene(), scene, canvas, correct);
+}
+
+// 每个入口只绘制指定画布，供完整教程和单图 iframe 共用。
+export const demos: Record<string, Demo> = {
+  'floor-affine': {
+    title: '屏幕空间插值',
+    width: 800,
+    height: 800,
+    run: canvas => drawFloor(canvas, false),
+  },
+  'floor-correct': {
+    title: '透视校正插值',
+    width: 800,
+    height: 800,
+    run: canvas => drawFloor(canvas, true),
+  },
+  'scene-affine': {
+    title: '屏幕空间插值',
+    width: 800,
+    height: 800,
+    run: canvas => drawScene(canvas, false),
+  },
+  'scene-correct': {
+    title: '透视校正插值',
+    width: 800,
+    height: 800,
+    run: canvas => drawScene(canvas, true),
+  },
+};

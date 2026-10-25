@@ -20,6 +20,7 @@ import {
 } from './math';
 import { Model, loadModel } from './model';
 import { Texture, loadTexture } from './texture';
+import type { Demo } from '../../shared/demo';
 
 const width = 800;
 const height = 800;
@@ -37,9 +38,9 @@ type Asset = {
 };
 
 // 加载模型和它的贴图：贴图的文件名，就是在模型文件名后面加上不同的后缀
-async function loadAsset(name: string): Promise<Asset> {
+async function loadAsset(name: string, model?: Model): Promise<Asset> {
   return {
-    model: await loadModel(`${name}.obj`),
+    model: model ?? (await loadModel(`${name}.obj`)),
     diffuse: await loadTexture(`${name}_diffuse.png`),
     nmTangent: await loadTexture(`${name}_nm_tangent.png`),
     spec: await loadTexture(`${name}_spec.png`),
@@ -216,26 +217,39 @@ function render(items: [Model, IShader][], frame: Frame, zbuffer: Float32Array) 
   }
 }
 
-function getCanvas(id: string) {
-  return document.querySelector<HTMLCanvasElement>(`#${id}`)!;
+let models: Promise<Model[]> | undefined;
+function getModels() {
+  return (models ??= Promise.all([
+    loadModel('/obj/diablo3_pose/diablo3_pose.obj'),
+    loadModel('/obj/floor.obj'),
+  ]));
+}
+let assets: Promise<Asset[]> | undefined;
+function getAssets() {
+  return (assets ??= getModels().then(([diablo, floor]) =>
+    Promise.all([
+      loadAsset('/obj/diablo3_pose/diablo3_pose', diablo),
+      loadAsset('/obj/floor', floor),
+    ]),
+  ));
 }
 
-const diablo = await loadAsset('/obj/diablo3_pose/diablo3_pose');
-const floor = await loadAsset('/obj/floor');
-
-// 第一遍：把相机放在光源的位置，用正交投影渲染一遍，得到 shadow map
+// 第一遍的结果供深度图和三种阴影示例复用，但只看深度时不需要加载贴图。
 const lightUniforms = createUniforms(light, false);
-const depthFrame = new Frame(width, height);
-const shadowbuffer = new Float32Array(width * height).fill(-Infinity);
-render(
-  [
-    [diablo.model, new DepthShader(diablo.model, lightUniforms)],
-    [floor.model, new DepthShader(floor.model, lightUniforms)],
-  ],
-  depthFrame,
-  shadowbuffer,
-);
-depthFrame.render(getCanvas('depth'));
+async function createShadowResult() {
+  const frame = new Frame(width, height);
+  const shadowbuffer = new Float32Array(width * height).fill(-Infinity);
+  render(
+    (await getModels()).map(model => [model, new DepthShader(model, lightUniforms)]),
+    frame,
+    shadowbuffer,
+  );
+  return { frame, shadowbuffer };
+}
+let shadowResult: ReturnType<typeof createShadowResult> | undefined;
+function getShadowResult() {
+  return (shadowResult ??= createShadowResult());
+}
 
 // 第二遍：从相机的位置正常渲染，每个像素都去 shadow map 里查一下自己有没有被挡住
 const uniforms = createUniforms(eye);
@@ -244,21 +258,38 @@ const MCamera = matMul(Viewport, matMul(uniforms.Projection, uniforms.ModelView)
 const MLight = matMul(Viewport, matMul(lightUniforms.Projection, lightUniforms.ModelView));
 const MShadow = matMul(MLight, inverse(MCamera));
 
-// 对比三种情况：bias 取无穷大相当于没有阴影；bias 取 0 会出现 shadow acne；最后是正常的阴影
-for (const [id, bias] of [
-  ['no-shadow', Infinity],
-  ['no-bias', 0],
-  ['shadow', 0.02],
-] as const) {
+async function drawShadow(canvas: HTMLCanvasElement, bias: number) {
+  const assets = await getAssets();
+  const { shadowbuffer } = await getShadowResult();
   const frame = new Frame(width, height);
   const zbuffer = new Float32Array(width * height).fill(-Infinity);
   render(
-    [
-      [diablo.model, new ShadowShader(diablo, uniforms, shadowbuffer, MShadow, bias)],
-      [floor.model, new ShadowShader(floor, uniforms, shadowbuffer, MShadow, bias)],
-    ],
+    assets.map(asset => [
+      asset.model,
+      new ShadowShader(asset, uniforms, shadowbuffer, MShadow, bias),
+    ]),
     frame,
     zbuffer,
   );
-  frame.render(getCanvas(id));
+  frame.render(canvas);
 }
+
+export const demos: Record<string, Demo> = {
+  depth: {
+    title: 'shadow map：从光源看过去的深度',
+    width,
+    height,
+    async run(canvas) {
+      (await getShadowResult()).frame.render(canvas);
+    },
+  },
+  // bias 取无穷大相当于没有阴影；取 0 会出现 shadow acne。
+  'no-shadow': { title: '没有阴影', width, height, run: canvas => drawShadow(canvas, Infinity) },
+  'no-bias': {
+    title: '不加 bias：shadow acne',
+    width,
+    height,
+    run: canvas => drawShadow(canvas, 0),
+  },
+  shadow: { title: '加上 bias 以后的阴影', width, height, run: canvas => drawShadow(canvas, 0.02) },
+};

@@ -1,3 +1,4 @@
+import type { Demo } from '../../shared/demo';
 import { Frame, Color } from './frame';
 import {
   Mat,
@@ -181,9 +182,34 @@ function render(
   frame.render(canvas);
 }
 
-const model = await loadModel('/obj/african_head/african_head.obj');
-const texture = await loadTexture('/obj/african_head/african_head_diffuse.png');
+let model: Promise<Model> | undefined;
+function getModel() {
+  return (model ??= loadModel('/obj/african_head/african_head.obj'));
+}
 
-render(model, document.querySelector<HTMLCanvasElement>('#flat')!, 'flat', null);
-render(model, document.querySelector<HTMLCanvasElement>('#gouraud')!, 'gouraud', null);
-render(model, document.querySelector<HTMLCanvasElement>('#texture')!, 'gouraud', texture);
+async function drawShading(
+  canvas: HTMLCanvasElement,
+  shading: 'flat' | 'gouraud',
+  textured = false,
+) {
+  const model = await getModel();
+  const texture = textured ? await loadTexture('/obj/african_head/african_head_diffuse.png') : null;
+  render(model, canvas, shading, texture);
+}
+
+// 每个入口只绘制指定画布，供完整教程和单图 iframe 共用。
+export const demos: Record<string, Demo> = {
+  flat: { title: 'flat 着色', width: 800, height: 800, run: canvas => drawShading(canvas, 'flat') },
+  gouraud: {
+    title: 'Gouraud 着色',
+    width: 800,
+    height: 800,
+    run: canvas => drawShading(canvas, 'gouraud'),
+  },
+  texture: {
+    title: 'Gouraud 着色 + 纹理',
+    width: 800,
+    height: 800,
+    run: canvas => drawShading(canvas, 'gouraud', true),
+  },
+};

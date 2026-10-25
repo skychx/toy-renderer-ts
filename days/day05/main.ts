@@ -1,3 +1,4 @@
+import type { Demo } from '../../shared/demo';
 import { Frame } from './frame';
 import { Vec2, Vec3, Vec4, cross, dot, identity, matVec, normalize, sub } from './math';
 import { Model, loadModel } from './model';
@@ -133,9 +134,37 @@ function render(
   frame.render(canvas);
 }
 
-const model = await loadModel('/obj/african_head/african_head.obj');
-const texture = await loadTexture('/obj/african_head/african_head_diffuse.png');
+let assets: Promise<[Model, Texture]> | undefined;
+function getAssets() {
+  return (assets ??= Promise.all([
+    loadModel('/obj/african_head/african_head.obj'),
+    loadTexture('/obj/african_head/african_head_diffuse.png'),
+  ]));
+}
 
-render(model, texture, document.querySelector<HTMLCanvasElement>('#ortho')!, ortho);
-render(model, texture, document.querySelector<HTMLCanvasElement>('#persp')!, persp);
-render(model, texture, document.querySelector<HTMLCanvasElement>('#persp-matrix')!, perspMatrix);
+async function drawProjection(canvas: HTMLCanvasElement, project: (v: Vec3) => Vec3) {
+  const [model, texture] = await getAssets();
+  render(model, texture, canvas, project);
+}
+
+// 每个入口只绘制指定画布，供完整教程和单图 iframe 共用。
+export const demos: Record<string, Demo> = {
+  ortho: {
+    title: '正交投影',
+    width: 800,
+    height: 800,
+    run: canvas => drawProjection(canvas, ortho),
+  },
+  persp: {
+    title: '透视投影（直接套相似三角形的公式）',
+    width: 800,
+    height: 800,
+    run: canvas => drawProjection(canvas, persp),
+  },
+  'persp-matrix': {
+    title: '透视投影（用投影矩阵）',
+    width: 800,
+    height: 800,
+    run: canvas => drawProjection(canvas, perspMatrix),
+  },
+};

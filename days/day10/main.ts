@@ -20,6 +20,7 @@ import {
 } from './math';
 import { Model, loadModel } from './model';
 import { Texture, loadTexture } from './texture';
+import type { Demo, DemoContext } from '../../shared/demo';
 
 const width = 800;
 const height = 800;
@@ -36,9 +37,9 @@ type Asset = {
 };
 
 // 加载模型和它的贴图：贴图的文件名，就是在模型文件名后面加上不同的后缀
-async function loadAsset(name: string): Promise<Asset> {
+async function loadAsset(name: string, model?: Model): Promise<Asset> {
   return {
-    model: await loadModel(`${name}.obj`),
+    model: model ?? (await loadModel(`${name}.obj`)),
     diffuse: await loadTexture(`${name}_diffuse.png`),
     nmTangent: await loadTexture(`${name}_nm_tangent.png`),
     spec: await loadTexture(`${name}_spec.png`),
@@ -388,98 +389,141 @@ class FinalShader implements IShader {
 
 // ---------------------------------------------------------------- 开始渲染
 
-function getCanvas(id: string) {
-  return document.querySelector<HTMLCanvasElement>(`#${id}`)!;
+// 模型、贴图和中间结果按需准备；嵌入 SSAO 时不会计算人头的 256 张 shadow map。
+const headNames = ['african_head', 'african_head_eye_inner'];
+let headModels: Promise<Model[]> | undefined;
+function getHeadModels() {
+  return (headModels ??= Promise.all(
+    headNames.map(name => loadModel(`/obj/african_head/${name}.obj`)),
+  ));
+}
+let sceneModels: Promise<Model[]> | undefined;
+function getSceneModels() {
+  return (sceneModels ??= Promise.all([
+    loadModel('/obj/diablo3_pose/diablo3_pose.obj'),
+    loadModel('/obj/floor.obj'),
+  ]));
+}
+let sceneAssets: Promise<Asset[]> | undefined;
+function getSceneAssets() {
+  return (sceneAssets ??= getSceneModels().then(([diablo, floor]) =>
+    Promise.all([
+      loadAsset('/obj/diablo3_pose/diablo3_pose', diablo),
+      loadAsset('/obj/floor', floor),
+    ]),
+  ));
 }
 
-const head = await Promise.all([
-  loadAsset('/obj/african_head/african_head'),
-  loadAsset('/obj/african_head/african_head_eye_inner'),
-]);
-const headModels = head.map(asset => asset.model);
-const diablo = await loadAsset('/obj/diablo3_pose/diablo3_pose');
-const floor = await loadAsset('/obj/floor');
-const progress = document.querySelector('#progress')!;
-
-// 1. 暴力法：先从 256 个方向各渲染一张 shadow map，再让每个像素挨个检查自己有没有被挡住
-const shadowMaps: ShadowMap[] = [];
-for (let i = 0; i < 256; i++) {
-  // 生成 shadow map 时也要包含眼球，环境光遮蔽才能考虑眼睑与眼球之间的遮挡。
-  shadowMaps.push(createShadowMap(headModels, randomSphereDirection()));
-  if (i % 8 === 0) {
-    progress.textContent = `正在渲染 shadow map：${i} / 256`;
-    await new Promise(resolve => setTimeout(resolve)); // 让浏览器喘口气，更新一下进度
-  }
+// 1. 暴力法：只有选择人头 AO 演示时，才从 256 个方向计算遮挡。
+let shadowMaps: Promise<ShadowMap[]> | undefined;
+function getShadowMaps(context: DemoContext) {
+  return (shadowMaps ??= (async () => {
+    const models = await getHeadModels();
+    const maps: ShadowMap[] = [];
+    for (let i = 0; i < 256; i++) {
+      context.signal.throwIfAborted();
+      // 包含眼球，才能考虑眼睑与眼球之间的遮挡。
+      maps.push(createShadowMap(models, randomSphereDirection()));
+      if (i % 8 === 0) {
+        context.onProgress(`正在渲染 shadow map：${i} / 256`);
+        await new Promise(resolve => setTimeout(resolve));
+      }
+    }
+    return maps;
+  })());
 }
-progress.textContent = '正在计算环境光遮蔽';
-await new Promise(resolve => setTimeout(resolve));
-
-const headUniforms = createUniforms(eye);
-for (const [id, textured] of [
-  ['ao-head', false],
-  ['ao-head-texture', true],
-] as const) {
+const uniforms = createUniforms(eye);
+async function drawAO(canvas: HTMLCanvasElement, context: DemoContext, textured: boolean) {
+  const models = await getHeadModels();
+  const maps = await getShadowMaps(context);
+  const textures = textured
+    ? await Promise.all(headNames.map(name => loadTexture(`/obj/african_head/${name}_diffuse.png`)))
+    : [];
+  context.onProgress('正在计算环境光遮蔽');
+  await new Promise(resolve => setTimeout(resolve));
+  context.signal.throwIfAborted();
   const frame = new Frame(width, height);
   const zbuffer = new Float32Array(width * height).fill(-Infinity);
   render(
-    head.map(({ model, diffuse }) => [
+    models.map((model, index) => [
       model,
-      new BruteForceAOShader(model, headUniforms, shadowMaps, textured ? diffuse : null),
+      new BruteForceAOShader(model, uniforms, maps, textures[index] ?? null),
     ]),
     frame,
     zbuffer,
   );
-  frame.render(getCanvas(id));
+  frame.render(canvas);
 }
 
-// 2. SSAO：先只画出深度，再对 zbuffer 做后处理
-const uniforms = createUniforms(eye);
-const zbuffer = new Float32Array(width * height).fill(-Infinity);
-render(
-  [
-    [diablo.model, new DepthShader(diablo.model, uniforms)],
-    [floor.model, new DepthShader(floor.model, uniforms)],
-  ],
-  new Frame(width, height),
-  zbuffer,
-);
-const aobuffer = ssao(zbuffer);
-const ssaoFrame = new Frame(width, height);
-for (let y = 0; y < height; y++) {
-  for (let x = 0; x < width; x++) {
-    if (zbuffer[x + y * width] !== -Infinity) {
-      const gray = aobuffer[x + y * width] * 255;
-      ssaoFrame.set(x, y, [gray, gray, gray]);
+// 2. SSAO：只依赖场景的深度，完全不需要加载颜色、法线或高光贴图。
+async function createSceneDepth() {
+  const zbuffer = new Float32Array(width * height).fill(-Infinity);
+  render(
+    (await getSceneModels()).map(model => [model, new DepthShader(model, uniforms)]),
+    new Frame(width, height),
+    zbuffer,
+  );
+  return { zbuffer, aobuffer: ssao(zbuffer) };
+}
+let sceneDepth: ReturnType<typeof createSceneDepth> | undefined;
+function getSceneDepth() {
+  return (sceneDepth ??= createSceneDepth());
+}
+async function drawSSAO(canvas: HTMLCanvasElement) {
+  const { zbuffer, aobuffer } = await getSceneDepth();
+  const frame = new Frame(width, height);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (zbuffer[x + y * width] !== -Infinity) {
+        const gray = aobuffer[x + y * width] * 255;
+        frame.set(x, y, [gray, gray, gray]);
+      }
     }
   }
+  frame.render(canvas);
 }
-ssaoFrame.render(getCanvas('ssao'));
 
-// 3. 全家福：shadow map 和 day9 一样，着色时再乘上 SSAO 的结果
-const lightUniforms = createUniforms(light, false);
-const shadowbuffer = new Float32Array(width * height).fill(-Infinity);
-render(
-  [
-    [diablo.model, new DepthShader(diablo.model, lightUniforms)],
-    [floor.model, new DepthShader(floor.model, lightUniforms)],
-  ],
-  new Frame(width, height),
-  shadowbuffer,
-);
-const Viewport = viewport(width / 8, height / 8, (width * 3) / 4, (height * 3) / 4);
-const MCamera = matMul(Viewport, matMul(uniforms.Projection, uniforms.ModelView));
-const MLight = matMul(Viewport, matMul(lightUniforms.Projection, lightUniforms.ModelView));
-const MShadow = matMul(MLight, inverse(MCamera));
+// 3. 全家福：复用 SSAO 的结果，再计算光源深度和最终着色。
+async function drawFinal(canvas: HTMLCanvasElement) {
+  const assets = await getSceneAssets();
+  const { aobuffer } = await getSceneDepth();
+  const lightUniforms = createUniforms(light, false);
+  const shadowbuffer = new Float32Array(width * height).fill(-Infinity);
+  render(
+    assets.map(({ model }) => [model, new DepthShader(model, lightUniforms)]),
+    new Frame(width, height),
+    shadowbuffer,
+  );
+  const Viewport = viewport(width / 8, height / 8, (width * 3) / 4, (height * 3) / 4);
+  const MCamera = matMul(Viewport, matMul(uniforms.Projection, uniforms.ModelView));
+  const MLight = matMul(Viewport, matMul(lightUniforms.Projection, lightUniforms.ModelView));
+  const MShadow = matMul(MLight, inverse(MCamera));
+  const frame = new Frame(width, height);
+  const zbuffer = new Float32Array(width * height).fill(-Infinity);
+  render(
+    assets.map(asset => [
+      asset.model,
+      new FinalShader(asset, uniforms, shadowbuffer, MShadow, aobuffer),
+    ]),
+    frame,
+    zbuffer,
+  );
+  frame.render(canvas);
+}
 
-const finalFrame = new Frame(width, height);
-const finalZbuffer = new Float32Array(width * height).fill(-Infinity);
-render(
-  [
-    [diablo.model, new FinalShader(diablo, uniforms, shadowbuffer, MShadow, aobuffer)],
-    [floor.model, new FinalShader(floor, uniforms, shadowbuffer, MShadow, aobuffer)],
-  ],
-  finalFrame,
-  finalZbuffer,
-);
-finalFrame.render(getCanvas('final'));
-progress.textContent = '全部渲染完成';
+export const demos: Record<string, Demo> = {
+  'ao-head': {
+    title: '暴力法：只有环境光',
+    width,
+    height,
+    run: (canvas, context) => drawAO(canvas, context, false),
+  },
+  'ao-head-texture': {
+    title: '环境光 × 贴图颜色',
+    width,
+    height,
+    run: (canvas, context) => drawAO(canvas, context, true),
+  },
+  ssao: { title: 'SSAO', width, height, run: drawSSAO },
+  final: { title: '全家福：阴影 + SSAO', width, height, run: drawFinal },
+};

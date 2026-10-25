@@ -1,8 +1,9 @@
+import type { Demo } from '../../shared/demo';
 import { Frame, Color } from './frame';
 import { IShader, lookAt, projection, triangle, viewport } from './gl';
 import { Vec2, Vec3, Vec4, dot, length, matMul, matVec, normalize, sub } from './math';
-import { loadModel } from './model';
-import { loadTexture } from './texture';
+import { Model, loadModel } from './model';
+import { Texture, loadTexture } from './texture';
 
 const width = 800;
 const height = 800;
@@ -16,8 +17,15 @@ const ModelView = lookAt(eye, center, up);
 const Projection = projection(length(sub(eye, center)));
 const Viewport = viewport(width / 8, height / 8, (width * 3) / 4, (height * 3) / 4);
 
-const model = await loadModel('/obj/african_head/african_head.obj');
-const texture = await loadTexture('/obj/african_head/african_head_diffuse.png');
+// 本章着色器共用的资源，在选中演示后加载。
+let model: Model;
+let texture: Texture;
+let modelPromise: Promise<Model> | undefined;
+function getModel() {
+  return (modelPromise ??= loadModel('/obj/african_head/african_head.obj').then(
+    value => (model = value),
+  ));
+}
 
 // Gouraud 着色器
 class GouraudShader implements IShader {
@@ -97,6 +105,38 @@ function render(shader: IShader, canvas: HTMLCanvasElement) {
   frame.render(canvas);
 }
 
-render(new GouraudShader(), document.querySelector<HTMLCanvasElement>('#gouraud')!);
-render(new ToonShader(), document.querySelector<HTMLCanvasElement>('#toon')!);
-render(new TextureShader(), document.querySelector<HTMLCanvasElement>('#texture')!);
+async function drawShader(canvas: HTMLCanvasElement, kind: 'gouraud' | 'toon' | 'texture') {
+  await getModel();
+  if (kind === 'texture') {
+    texture = await loadTexture('/obj/african_head/african_head_diffuse.png');
+  }
+  const shader =
+    kind === 'texture'
+      ? new TextureShader()
+      : kind === 'toon'
+        ? new ToonShader()
+        : new GouraudShader();
+  render(shader, canvas);
+}
+
+// 每个入口只绘制指定画布，供完整教程和单图 iframe 共用。
+export const demos: Record<string, Demo> = {
+  gouraud: {
+    title: 'Gouraud 着色器',
+    width: 800,
+    height: 800,
+    run: canvas => drawShader(canvas, 'gouraud'),
+  },
+  toon: {
+    title: '把光照强度分成 6 档',
+    width: 800,
+    height: 800,
+    run: canvas => drawShader(canvas, 'toon'),
+  },
+  texture: {
+    title: 'Gouraud 着色器 + 纹理',
+    width: 800,
+    height: 800,
+    run: canvas => drawShader(canvas, 'texture'),
+  },
+};

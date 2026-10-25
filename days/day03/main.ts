@@ -1,6 +1,7 @@
+import type { Demo } from '../../shared/demo';
 import { Frame, Color } from './frame';
 import { Vec2, Vec3, cross, dot, normalize, sub } from './math';
-import { loadModel } from './model';
+import { Model, loadModel } from './model';
 
 const red: Color = [255, 0, 0];
 const width = 800;
@@ -112,7 +113,7 @@ function drawBarycentricTriangle(canvas: HTMLCanvasElement) {
 
 // 给模型的每个三角形随机上色
 async function drawRandomColorModel(canvas: HTMLCanvasElement) {
-  const model = await loadModel('/obj/african_head/african_head.obj');
+  const model = await getModel();
   const frame = new Frame(width, height);
 
   for (let i = 0; i < model.nfaces(); i++) {
@@ -135,7 +136,7 @@ async function drawRandomColorModel(canvas: HTMLCanvasElement) {
 
 // 用一个模拟光照给三角形着色
 async function drawLightModel(canvas: HTMLCanvasElement) {
-  const model = await loadModel('/obj/african_head/african_head.obj');
+  const model = await getModel();
   const frame = new Frame(width, height);
   const lightDir: Vec3 = [0, 0, -1]; // 假设光是垂直屏幕照进去的
 
@@ -171,7 +172,27 @@ async function drawLightModel(canvas: HTMLCanvasElement) {
   frame.render(canvas);
 }
 
-drawCrossProductTriangle(document.querySelector<HTMLCanvasElement>('#cross-product')!);
-drawBarycentricTriangle(document.querySelector<HTMLCanvasElement>('#barycentric')!);
-await drawRandomColorModel(document.querySelector<HTMLCanvasElement>('#random-colors')!);
-await drawLightModel(document.querySelector<HTMLCanvasElement>('#light')!);
+let model: Promise<Model> | undefined;
+function getModel() {
+  return (model ??= loadModel('/obj/african_head/african_head.obj'));
+}
+
+// 每个入口只绘制指定画布，供完整教程和单图 iframe 共用。
+export const demos: Record<string, Demo> = {
+  'cross-product': {
+    title: '用叉乘画三角形',
+    width: 200,
+    height: 200,
+    pixelated: true,
+    run: drawCrossProductTriangle,
+  },
+  barycentric: {
+    title: '用重心坐标画三角形',
+    width: 200,
+    height: 200,
+    pixelated: true,
+    run: drawBarycentricTriangle,
+  },
+  'random-colors': { title: '随机着色', width: 800, height: 800, run: drawRandomColorModel },
+  light: { title: '简单的光照着色', width: 800, height: 800, run: drawLightModel },
+};

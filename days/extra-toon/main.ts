@@ -1,3 +1,4 @@
+import type { Demo } from '../../shared/demo';
 import { Frame, Color } from './frame';
 import { IShader, lookAt, projection, triangle, viewport } from './gl';
 import { Mat, Vec3, Vec4, dot, interpolate, length, matMul, matVec, normalize } from './math';
@@ -91,13 +92,10 @@ function sobel(zbuffer: Float32Array): Float32Array {
   return edges;
 }
 
-function getCanvas(id: string) {
-  return document.querySelector<HTMLCanvasElement>(`#${id}`)!;
+let diablo: Promise<Model> | undefined;
+function getDiablo() {
+  return (diablo ??= loadModel('/obj/diablo3_pose/diablo3_pose.obj'));
 }
-
-const diablo = await loadModel('/obj/diablo3_pose/diablo3_pose.obj');
-const head = await loadModel('/obj/african_head/african_head.obj');
-const eyes = await loadModel('/obj/african_head/african_head_eye_inner.obj');
 const M = matMul(projection(length(eye)), lookAt(eye, [0, 0, 0], [0, 1, 0]));
 
 // 渲染模型，返回画好的帧缓冲和 zbuffer
@@ -129,29 +127,55 @@ function drawEdges(frame: Frame, edges: Float32Array) {
 
 const orange: Color = [240, 150, 90];
 
-// 1. 平滑的光照 vs 分成 3 档的光照
-render([[diablo, orange]], false).frame.render(getCanvas('smooth'));
-const { frame, zbuffer } = render([[diablo, orange]], true);
-frame.render(getCanvas('bands'));
+let bands: Promise<ReturnType<typeof render>> | undefined;
+function getBands() {
+  return (bands ??= getDiablo().then(model => render([[model, orange]], true)));
+}
 
-// 2. 对 zbuffer 做边缘检测，变化剧烈的地方就是轮廓
-const edges = sobel(zbuffer);
-const edgeFrame = new Frame(width, height);
-edgeFrame.clear([255, 255, 255]);
-drawEdges(edgeFrame, edges);
-edgeFrame.render(getCanvas('edges'));
+async function drawSmooth(canvas: HTMLCanvasElement) {
+  render([[await getDiablo(), orange]], false).frame.render(canvas);
+}
 
-// 3. 把轮廓画到色阶的结果上
-drawEdges(frame, edges);
-frame.render(getCanvas('toon'));
+async function drawBands(canvas: HTMLCanvasElement) {
+  (await getBands()).frame.render(canvas);
+}
 
-// 4. 换成人头试试
-const headResult = render(
-  [
-    [head, [230, 180, 140]],
-    [eyes, [230, 230, 230]],
-  ],
-  true,
-);
-drawEdges(headResult.frame, sobel(headResult.zbuffer));
-headResult.frame.render(getCanvas('head'));
+async function drawOutline(canvas: HTMLCanvasElement, colored: boolean) {
+  const result = await getBands();
+  const frame = new Frame(width, height);
+  // 保留色阶的原图，描边后的结果不修改其他演示共用的缓存。
+  if (colored) frame.imageData.data.set(result.frame.imageData.data);
+  else frame.clear([255, 255, 255]);
+  drawEdges(frame, sobel(result.zbuffer));
+  frame.render(canvas);
+}
+
+async function drawHead(canvas: HTMLCanvasElement) {
+  const [head, eyes] = await Promise.all([
+    loadModel('/obj/african_head/african_head.obj'),
+    loadModel('/obj/african_head/african_head_eye_inner.obj'),
+  ]);
+  const result = render(
+    [
+      [head, [230, 180, 140]],
+      [eyes, [230, 230, 230]],
+    ],
+    true,
+  );
+  drawEdges(result.frame, sobel(result.zbuffer));
+  result.frame.render(canvas);
+}
+
+// 每个入口只绘制指定画布，供完整教程和单图 iframe 共用。
+export const demos: Record<string, Demo> = {
+  smooth: { title: '平滑的光照', width: 800, height: 800, run: drawSmooth },
+  bands: { title: '光照分成 3 档', width: 800, height: 800, run: drawBands },
+  edges: {
+    title: 'Sobel 边缘检测',
+    width: 800,
+    height: 800,
+    run: canvas => drawOutline(canvas, false),
+  },
+  toon: { title: '色阶 + 描边', width: 800, height: 800, run: canvas => drawOutline(canvas, true) },
+  head: { title: '换成人头试试', width: 800, height: 800, run: drawHead },
+};
