@@ -24,6 +24,7 @@ GPU 番外使用 [WebGPU](https://developer.mozilla.org/en-US/docs/Web/API/WebGP
 ```bash
 .
 ├── days        # 每一天的代码，每个文件夹都是一份完整的、能单独运行的代码
+├── embed       # 博客 iframe 的单画布页面
 ├── obj         # 模型和贴图（来自 tinyrenderer，贴图从 tga 转成了 png）
 ├── scripts     # 准备素材用的脚本
 ├── shared      # 页面布局、加载状态和章节导航，不参与渲染计算
@@ -45,6 +46,41 @@ day2～day7 只使用头部网格，专注各章的核心概念。
 从 day8 开始，借助 `Asset` 加入独立双眼 `african_head_eye_inner.obj`，演示多网格与独立材质；模型坐标已经对齐。
 头部和双眼使用各自的贴图，共用帧缓冲和深度缓冲，让眼睑正确遮挡眼球。
 day10 的环境光遮蔽采样也包含双眼；两个 WebGPU 番外的 CPU、GPU 均绘制同一组网格和材质。
+
+## 在博客中嵌入 Canvas
+
+所有 14 个章节、51 个演示都支持 `/embed/<章节>/<演示>/` 独立地址，例如：
+
+- `/embed/day08/tangent/`：切线空间法线贴图
+- `/embed/day09/depth/`：光源深度图
+- `/embed/extra-webgpu/webgpu/`：只运行 WebGPU
+- `/embed/extra-webgpu-optimized/software/`：只运行优化后的 CPU 软渲染
+
+教程页每张画布下都有「单独查看」链接；完整地址清单在 `/embeds.json`。
+iframe 页面只显示选中的 Canvas 和必要的加载状态、FPS，动画移出视野或页面进入后台时暂停。
+静态示例仍只渲染一次，缩放 iframe 不会改变教学算法的内部渲染分辨率。
+
+```html
+<iframe
+  src="https://renderer.example.com/embed/day08/tangent/"
+  title="切线空间法线贴图"
+  width="800"
+  height="800"
+  loading="lazy"
+  style="display:block;width:100%;height:auto;aspect-ratio:1;border:0"
+></iframe>
+```
+
+构建并预览部署产物：
+
+```bash
+bun run build
+bun run preview  # http://localhost:8081
+```
+
+将 `dist/` 部署到独立域名的根目录，通过 HTTPS 供博客引用，无需在线运行 Bun。
+开发服务器默认用 8080，预览默认用 8081，均可通过 `PORT=8082 bun dev` 这样的方式指定其他端口。
+更多地址、架构约定和部署配置见 [iframe 嵌入说明](docs/embedding.md)。
 
 ## 软渲染性能对照
 
