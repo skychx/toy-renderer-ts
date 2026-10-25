@@ -15,7 +15,7 @@ bun dev
 
 打开 http://localhost:8080 就能看到每一天的渲染结果。
 
-GPU 番外的 [代码](days/extra-webgl) 已升级为 [WebGPU](https://developer.mozilla.org/en-US/docs/Web/API/WebGPU_API)，目录和教程链接沿用原来的名字。
+GPU 番外的 [代码](days/extra-webgpu) 已升级为 [WebGPU](https://developer.mozilla.org/en-US/docs/Web/API/WebGPU_API)；旧教程链接仍然保留。
 使用支持 WebGPU 的浏览器，通过 localhost 或 HTTPS 打开，即可对比 CPU 软渲染与 GPU 渲染的实时帧率。
 代码中用 [WGSL](https://www.w3.org/TR/WGSL/) 对照 TypeScript 着色器，并注释了资源绑定、矩阵上传和深度范围的区别。
 
@@ -52,7 +52,7 @@ diff -r days/day04 days/day05
 | [day10：环境光遮蔽](https://supercodepower.com/docs/toy-renderer/day10-Ambient-occlusion)                   | [days/day10](days/day10)                         |
 | [番外：透视校正插值](https://supercodepower.com/docs/toy-renderer/extra1-Perspective-correct-interpolation) | [days/extra-perspective](days/extra-perspective) |
 | [番外：卡通渲染](https://supercodepower.com/docs/toy-renderer/extra2-Toon-shading)                          | [days/extra-toon](days/extra-toon)               |
-| [番外：用 WebGL 重写一遍](https://supercodepower.com/docs/toy-renderer/extra3-WebGL)                        | [days/extra-webgl](days/extra-webgl)             |
+| [番外：用 WebGPU 重写一遍](https://supercodepower.com/docs/toy-renderer/extra3-WebGL)                       | [days/extra-webgpu](days/extra-webgpu)           |
 
 ## 致谢
 

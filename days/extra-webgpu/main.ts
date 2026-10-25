@@ -277,7 +277,7 @@ function showGPUError(message: string) {
 
 // 软渲染器在独立的 Worker 里跑，WebGPU 不可用时也能继续展示 CPU 端的结果
 const offscreen = softwareCanvas.transferControlToOffscreen();
-const worker = new Worker('/extra-webgl/software.ts', { type: 'module' });
+const worker = new Worker('/extra-webgpu/software.ts', { type: 'module' });
 worker.postMessage({ canvas: offscreen }, [offscreen]);
 worker.onmessage = e => {
   document.querySelector('#software-fps')!.textContent = `${e.data.fps.toFixed(1)} FPS`;

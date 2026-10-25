@@ -22,6 +22,10 @@ const server = Bun.serve({
   // routes 没匹配上的请求都会走到这里
   async fetch(req) {
     const path = decodeURIComponent(new URL(req.url).pathname);
+    // 旧番外地址保留跳转，章节目录已改名为 extra-webgpu
+    if (path === '/extra-webgl' || path === '/extra-webgl/') {
+      return Response.redirect(new URL('/extra-webgpu', req.url), 302);
+    }
     // obj 目录下的模型和贴图，原样返回
     if (path.startsWith('/obj/')) {
       const file = Bun.file(`.${path}`);
@@ -29,7 +33,7 @@ const server = Bun.serve({
         return new Response(file);
       }
     }
-    // Web Worker 用的 TS 文件（比如 /extra-webgl/software.ts）：
+    // Web Worker 用的 TS 文件（比如 /extra-webgpu/software.ts）：
     // Bun 打包 html 的时候不会处理 new Worker()，所以在这里现场打包一下再返回
     if (path.endsWith('.ts') && (await Bun.file(`./days${path}`).exists())) {
       const { outputs } = await Bun.build({ entrypoints: [`./days${path}`] });
