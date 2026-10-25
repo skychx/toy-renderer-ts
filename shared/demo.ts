@@ -103,6 +103,7 @@ export function mountDemo(demo: Demo, canvas: HTMLCanvasElement) {
         signal: abort.signal,
         isActive,
         onProgress(message) {
+          if (abort.signal.aborted) return;
           stage.querySelector('.canvas-status')!.textContent = message;
           const progress = document.querySelector('#progress');
           if (progress) progress.textContent = message;

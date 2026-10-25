@@ -83,7 +83,8 @@ async function renderFixture(chapter: string, hiddenEye: boolean, worker = false
     height: 1,
     data: new Uint8ClampedArray(JSON.parse(await blob.text())),
   });
-  let nextFrame = () => {};
+  const timers = new Map<number, () => void>();
+  let timerID = 0;
   // 只替换浏览器边界，实际模型解析、着色器、光栅化和帧缓冲都执行项目代码。
   const execute = new (Object.getPrototypeOf(async function () {}).constructor)(
     'document',
@@ -92,6 +93,7 @@ async function renderFixture(chapter: string, hiddenEye: boolean, worker = false
     'OffscreenCanvas',
     'createImageBitmap',
     'setTimeout',
+    'clearTimeout',
     'postMessage',
     'onmessage',
     `${code.replace(/^export\s*\{[^}]*\};?\s*$/m, '')}\nreturn ${worker ? 'onmessage' : 'demos'};`,
@@ -103,8 +105,10 @@ async function renderFixture(chapter: string, hiddenEye: boolean, worker = false
     TestCanvas,
     createImageBitmap,
     (callback: () => void) => {
-      nextFrame = callback;
+      timers.set(++timerID, callback);
+      return timerID;
     },
+    (id: number) => timers.delete(id),
     () => {},
     null,
   );
@@ -123,9 +127,11 @@ async function renderFixture(chapter: string, hiddenEye: boolean, worker = false
     ? gl.perspective(Math.PI / 4, 1, 0.1, 100)
     : gl.projection(Math.sqrt(11));
   if (worker) {
+    expect(timers.size).toBe(0);
     onmessage({
       data: {
         canvas: document.querySelector('#software'),
+        active: false,
         uniforms: {
           ModelView,
           Projection,
@@ -134,7 +140,17 @@ async function renderFixture(chapter: string, hiddenEye: boolean, worker = false
         },
       },
     });
+    expect(timers.size).toBe(0);
+    onmessage({ data: { active: true } });
+    expect(timers.size).toBe(1);
+    const [id, nextFrame] = [...timers][0];
+    timers.delete(id);
     nextFrame();
+    expect(timers.size).toBe(1);
+    onmessage({ data: { active: false } });
+    expect(timers.size).toBe(0);
+    onmessage({ data: { active: true } });
+    expect(timers.size).toBe(1);
   }
   const Viewport = worker ? gl.viewport(0, 0, 800, 800) : gl.viewport(100, 100, 600, 600);
   const M = math.matMul(Viewport, math.matMul(Projection, ModelView));

@@ -29,9 +29,25 @@ import { Texture, loadTexture } from './texture';
 // 主线程发来的消息：一开始是画布，之后相机每动一下，就发来一份新的 uniform
 let canvas: OffscreenCanvas | null = null;
 let uniforms: Uniforms | null = null;
+let active = false;
+let assetsReady = false;
+let frames = 0;
+let firstFrame = true;
+let last: number | null = null;
+let timer: ReturnType<typeof setTimeout> | undefined;
 onmessage = (e: MessageEvent) => {
   if (e.data.canvas) canvas = e.data.canvas;
   if (e.data.uniforms) uniforms = e.data.uniforms;
+  if (typeof e.data.active === 'boolean' && active !== e.data.active) {
+    active = e.data.active;
+    frames = 0;
+    last = null; // 后台与屏幕外停留的时间不计入 FPS。
+    if (!active && timer !== undefined) {
+      clearTimeout(timer);
+      timer = undefined;
+    }
+  }
+  schedule();
 };
 
 type Asset = {
@@ -164,11 +180,12 @@ function render(canvas: OffscreenCanvas, uniforms: Uniforms) {
 
 // 画完一帧马上接着画下一帧，累计至少 250 毫秒后把帧率告诉主线程
 // 如果一帧本身就超过 250 毫秒，就在这一帧完成后更新
-let frames = 0;
-let firstFrame = true;
-let last: number | null = null;
+function schedule() {
+  if (active && assetsReady && canvas && uniforms && timer === undefined) timer = setTimeout(loop);
+}
 function loop() {
-  if (canvas && uniforms) {
+  timer = undefined;
+  if (active && canvas && uniforms) {
     // 从真正开始渲染时计时，避免把等待画布和 uniform 的时间算进去
     last ??= performance.now();
     render(canvas, uniforms);
@@ -184,6 +201,8 @@ function loop() {
       last = now;
     }
   }
-  setTimeout(loop);
+  schedule();
 }
-loop();
+// 等资源和首条初始化消息都到齐，再开始；暂停后不继续轮询。
+assetsReady = true;
+schedule();

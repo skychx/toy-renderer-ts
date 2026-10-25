@@ -37,8 +37,10 @@ const server = Bun.serve({
     }
     // Web Worker 用的 TS 文件（比如 /extra-webgpu/software.ts）：
     // Bun 打包 html 的时候不会处理 new Worker()，所以在这里现场打包一下再返回
-    if (path.endsWith('.ts') && (await Bun.file(`./days${path}`).exists())) {
-      const { outputs } = await Bun.build({ entrypoints: [`./days${path}`] });
+    if (['/extra-webgpu/software.js', '/extra-webgpu-optimized/software.js'].includes(path)) {
+      const { outputs } = await Bun.build({
+        entrypoints: [`./days${path.replace(/\.js$/, '.ts')}`],
+      });
       return new Response(outputs[0]);
     }
     return new Response('Not Found', { status: 404 });

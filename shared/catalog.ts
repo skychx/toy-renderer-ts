@@ -14,4 +14,6 @@ export const demoLoaders: Record<string, () => Promise<DemoModule>> = {
   day10: () => import('../days/day10/main'),
   'extra-perspective': () => import('../days/extra-perspective/main'),
   'extra-toon': () => import('../days/extra-toon/main'),
+  'extra-webgpu': () => import('../days/extra-webgpu/main'),
+  'extra-webgpu-optimized': () => import('../days/extra-webgpu-optimized/main'),
 };
