@@ -5,7 +5,7 @@
  * 想要实现不同的效果，只需要在 main.ts 里写不同的着色器（Shader）
  */
 import { Frame, Color } from './frame';
-import { Mat, Vec2, Vec3, Vec4, cross, matMul, matVec, normalize, sub } from './math';
+import { Mat, Vec3, Vec4, cross, matMul, matVec, normalize, sub } from './math';
 
 // 视图矩阵：把世界坐标变换到相机的坐标系下（OpenGL 的版本，和 day6 的只差了平移这一步）
 export function lookAt(eye: Vec3, center: Vec3, up: Vec3): Mat {
@@ -63,23 +63,6 @@ export interface IShader {
   fragment(bar: Vec3, fragCoord: Vec3): Color | null;
 }
 
-// 利用重心坐标判断点是否在三角形内部
-function barycentric(pts: Vec3[], P: Vec2): Vec3 {
-  const [A, B, C] = pts;
-  const x: Vec3 = [B[0] - A[0], C[0] - A[0], A[0] - P[0]]; // AB、AC、PA 在 x 轴上的分量
-  const y: Vec3 = [B[1] - A[1], C[1] - A[1], A[1] - P[1]]; // AB、AC、PA 在 y 轴上的分量
-
-  // [u, v, 1] 和 x、y 两个向量的点乘都为 0，所以 x、y 叉乘得到的向量和 [u, v, 1] 平行
-  const u = cross(x, y);
-
-  // A、B、C、P 的 x、y 坐标都是整数，所以 u[2] 也一定是整数
-  // 所以 u[2] 的绝对值小于 1 意味着它就是 0，三角形退化成了一条线段，直接舍弃
-  if (Math.abs(u[2]) < 1) {
-    return [-1, 1, 1];
-  }
-  return [1 - (u[0] + u[1]) / u[2], u[0] / u[2], u[1] / u[2]];
-}
-
 // 光栅化：把顶点着色器输出的三个裁剪坐标变换到屏幕上，然后对三角形里的每个像素调用片元着色器
 // perspectiveCorrect 为 false 时，直接用屏幕上的重心坐标插值（也就是前十天的做法）
 export function triangle(
@@ -96,6 +79,17 @@ export function triangle(
     return [Math.round(x / w), Math.round(y / w), z / w];
   });
 
+  // Before：每个候选像素都构造向量、做叉乘，重复计算同一组三角形边和面积
+  // After：先算好 AB、AC 和有向面积；像素循环里只计算随 P 变化的分子
+  const [A, B, C] = pts;
+  const abX = B[0] - A[0];
+  const acX = C[0] - A[0];
+  const abY = B[1] - A[1];
+  const acY = C[1] - A[1];
+  const area = abX * acY - acX * abY;
+  // 屏幕坐标已经取整，面积小于 1 就是 0：整块三角形退化，直接跳过
+  if (Math.abs(area) < 1) return;
+
   // 找出包围盒，包围盒不能超出画布的边界
   const xs = pts.map(p => p[0]);
   const ys = pts.map(p => p[1]);
@@ -104,29 +98,42 @@ export function triangle(
   const maxX = Math.min(frame.width - 1, Math.max(...xs));
   const maxY = Math.min(frame.height - 1, Math.max(...ys));
 
-  // 遍历包围盒里的每一个像素
-  for (let x = minX; x <= maxX; x++) {
-    for (let y = minY; y <= maxY; y++) {
-      const bc = barycentric(pts, [x, y]);
-      if (bc[0] < 0 || bc[1] < 0 || bc[2] < 0) {
+  // Before：每个像素都重新计算两个分子，先除以面积、分配数组，再判断内外
+  // After：按行扫描，向右一步时 u += acY、v -= abY；分子是整数，没有浮点累加误差
+  const positiveArea = area > 0;
+  for (let y = minY; y <= maxY; y++) {
+    const paY = A[1] - y;
+    let u = acX * paY - (A[0] - minX) * acY;
+    let v = (A[0] - minX) * abY - abX * paY;
+    for (let x = minX; x <= maxX; x++, u += acY, v -= abY) {
+      // 三个权重分别是 (area-u-v)/area、u/area、v/area
+      // 先比较整数分子的符号，三角形外的像素连除法和数组分配都不用做
+      const sumUV = u + v;
+      if (positiveArea ? u < 0 || v < 0 || sumUV > area : u > 0 || v > 0 || sumUV < area) {
         continue;
       }
+      const bc0 = 1 - sumUV / area;
+      const bc1 = u / area;
+      const bc2 = v / area;
 
       // 深度测试：和 OpenGL 一样，z 越小离相机越近，被挡住的像素直接跳过，连片元着色器都不用调
-      const z = pts[0][2] * bc[0] + pts[1][2] * bc[1] + pts[2][2] * bc[2];
+      const z = pts[0][2] * bc0 + pts[1][2] * bc1 + pts[2][2] * bc2;
       const index = x + y * frame.width;
       if (zbuffer[index] <= z) {
         continue;
       }
 
       // 透视校正：屏幕上的重心坐标分别除以三个顶点的 w，再归一化，就是三维空间里真正的重心坐标
-      let bar = bc;
+      // 只有通过内外判断和深度测试的像素，才需要给 shader 创建坐标数组
+      let bar: Vec3;
       if (perspectiveCorrect) {
-        const a = bc[0] / clip[0][3];
-        const b = bc[1] / clip[1][3];
-        const c = bc[2] / clip[2][3];
+        const a = bc0 / clip[0][3];
+        const b = bc1 / clip[1][3];
+        const c = bc2 / clip[2][3];
         const sum = a + b + c;
         bar = [a / sum, b / sum, c / sum];
+      } else {
+        bar = [bc0, bc1, bc2];
       }
 
       // 调用片元着色器，算出这个像素的颜色
