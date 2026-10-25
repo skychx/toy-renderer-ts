@@ -140,31 +140,29 @@ function drawZBuffer(zbuffer: Float32Array, canvas: HTMLCanvasElement) {
 
 // 用 zbuffer 画模型
 async function drawZBufferModel(canvas: HTMLCanvasElement, zbufferCanvas: HTMLCanvasElement) {
+  const model = await loadModel('/obj/african_head/african_head.obj');
   const frame = new Frame(width, height);
   const zbuffer = createZBuffer();
 
-  // 两个网格共用深度缓冲，眼睑和眼球才能互相遮挡。
-  for (const { model } of assets) {
-    // 遍历所有三角形
-    for (let i = 0; i < model.nfaces(); i++) {
-      const face = model.face(i);
-      const screenCoords: Vec3[] = [];
-      const worldCoords: Vec3[] = [];
+  // 遍历所有三角形
+  for (let i = 0; i < model.nfaces(); i++) {
+    const face = model.face(i);
+    const screenCoords: Vec3[] = [];
+    const worldCoords: Vec3[] = [];
 
-      // 每个三角形的顶点都是一个三维向量
-      for (let j = 0; j < 3; j++) {
-        const v = model.vert(face[j]);
-        worldCoords.push(v);
-        screenCoords.push(world2screen(v)); // 正交投影，而且只做了个简单的视口变换
-      }
+    // 每个三角形的顶点都是一个三维向量
+    for (let j = 0; j < 3; j++) {
+      const v = model.vert(face[j]);
+      worldCoords.push(v);
+      screenCoords.push(world2screen(v)); // 正交投影，而且只做了个简单的视口变换
+    }
 
-      // 计算光照强度
-      const intensity = lightIntensity(worldCoords);
+    // 计算光照强度
+    const intensity = lightIntensity(worldCoords);
 
-      // 着色时同时考虑光照和 zbuffer，渲染效果会好一些
-      if (intensity > 0) {
-        triangle(screenCoords, zbuffer, frame, [intensity * 255, intensity * 255, intensity * 255]);
-      }
+    // 着色时同时考虑光照和 zbuffer，渲染效果会好一些
+    if (intensity > 0) {
+      triangle(screenCoords, zbuffer, frame, [intensity * 255, intensity * 255, intensity * 255]);
     }
   }
 
@@ -174,40 +172,32 @@ async function drawZBufferModel(canvas: HTMLCanvasElement, zbufferCanvas: HTMLCa
 
 // 给模型贴上纹理
 async function drawTextureModel(canvas: HTMLCanvasElement) {
+  const model = await loadModel('/obj/african_head/african_head.obj');
+  const texture = await loadTexture('/obj/african_head/african_head_diffuse.png');
   const frame = new Frame(width, height);
   const zbuffer = createZBuffer();
 
-  // UV 只对各自的贴图有意义，眼球不能使用头部的纹理。
-  for (const { model, texture } of assets) {
-    for (let i = 0; i < model.nfaces(); i++) {
-      const face = model.face(i);
-      const screenCoords: Vec3[] = [];
-      const worldCoords: Vec3[] = [];
-      const uvs: Vec2[] = [];
+  for (let i = 0; i < model.nfaces(); i++) {
+    const face = model.face(i);
+    const screenCoords: Vec3[] = [];
+    const worldCoords: Vec3[] = [];
+    const uvs: Vec2[] = [];
 
-      for (let j = 0; j < 3; j++) {
-        const v = model.vert(face[j]);
-        worldCoords.push(v);
-        screenCoords.push(world2screen(v));
-        uvs.push(model.uv(i, j)); // 拿出三个顶点的 uv 坐标
-      }
+    for (let j = 0; j < 3; j++) {
+      const v = model.vert(face[j]);
+      worldCoords.push(v);
+      screenCoords.push(world2screen(v));
+      uvs.push(model.uv(i, j)); // 拿出三个顶点的 uv 坐标
+    }
 
-      const intensity = lightIntensity(worldCoords);
-      if (intensity > 0) {
-        triangleWithTexture(screenCoords, uvs, zbuffer, frame, texture, intensity);
-      }
+    const intensity = lightIntensity(worldCoords);
+    if (intensity > 0) {
+      triangleWithTexture(screenCoords, uvs, zbuffer, frame, texture, intensity);
     }
   }
 
   frame.render(canvas);
 }
-
-const assets = await Promise.all(
-  ['african_head', 'african_head_eye_inner'].map(async name => ({
-    model: await loadModel(`/obj/african_head/${name}.obj`),
-    texture: await loadTexture(`/obj/african_head/${name}_diffuse.png`),
-  })),
-);
 
 await drawZBufferModel(
   document.querySelector<HTMLCanvasElement>('#zbuffer-model')!,

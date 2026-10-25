@@ -252,6 +252,7 @@ function getCanvas(id: string) {
   return document.querySelector<HTMLCanvasElement>(`#${id}`)!;
 }
 
+// 从本章开始加入独立双眼：用 Asset 把每个网格和它自己的贴图组合起来。
 const head = await Promise.all([
   loadAsset('/obj/african_head/african_head'),
   loadAsset('/obj/african_head/african_head_eye_inner'),

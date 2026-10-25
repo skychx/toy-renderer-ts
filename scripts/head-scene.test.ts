@@ -106,64 +106,44 @@ async function renderFixture(chapter: string, hiddenEye: boolean, worker = false
     () => {},
     null,
   );
-  let x = hiddenEye ? -0.5 : 0;
-  let y = 0;
+  const x = hiddenEye ? -0.5 : 0;
   const z = hiddenEye ? -0.3 : 0.3;
-  if (chapter === 'day04' || chapter === 'day05') {
-    const k = chapter === 'day05' ? 1 / (1 - z / 3) : 1;
-    x = (x * k + 1) * 400;
-    y = 400;
-  } else {
-    // day6 的相机/投影函数尚未移入 gl.ts，公式与 day7 相同。
-    const gl = await import(`../days/${chapter === 'day06' ? 'day07' : chapter}/gl`);
-    const math = await import(`../days/${chapter}/math`);
-    const ModelView = gl.lookAt([1, 1, 3], [0, 0, 0], [0, 1, 0]);
-    const Projection = worker
-      ? gl.perspective(Math.PI / 4, 1, 0.1, 100)
-      : gl.projection(Math.sqrt(11));
-    if (worker) {
-      onmessage({
-        data: {
-          canvas: document.querySelector('#software'),
-          uniforms: {
-            ModelView,
-            Projection,
-            ModelViewIT: math.transpose(math.inverse(ModelView)),
-            light: [1, 1, 1],
-          },
+  const gl = await import(`../days/${chapter}/gl`);
+  const math = await import(`../days/${chapter}/math`);
+  const ModelView = gl.lookAt([1, 1, 3], [0, 0, 0], [0, 1, 0]);
+  const Projection = worker
+    ? gl.perspective(Math.PI / 4, 1, 0.1, 100)
+    : gl.projection(Math.sqrt(11));
+  if (worker) {
+    onmessage({
+      data: {
+        canvas: document.querySelector('#software'),
+        uniforms: {
+          ModelView,
+          Projection,
+          ModelViewIT: math.transpose(math.inverse(ModelView)),
+          light: [1, 1, 1],
         },
-      });
-      nextFrame();
-    }
-    const Viewport = worker ? gl.viewport(0, 0, 800, 800) : gl.viewport(100, 100, 600, 600);
-    const M = math.matMul(Viewport, math.matMul(Projection, ModelView));
-    const p = math.matVec(M, [x, 0, z, 1]);
-    x = p[0] / p[3];
-    y = p[1] / p[3];
+      },
+    });
+    nextFrame();
   }
-  const id = worker
-    ? '#software'
-    : chapter === 'day08'
-      ? '#tangent'
-      : chapter === 'day05'
-        ? '#persp-matrix'
-        : '#texture';
-  const image = document.querySelector(id).image;
-  const index = ((799 - Math.round(y)) * 800 + Math.round(x)) * 4;
+  const Viewport = worker ? gl.viewport(0, 0, 800, 800) : gl.viewport(100, 100, 600, 600);
+  const M = math.matMul(Viewport, math.matMul(Projection, ModelView));
+  const p = math.matVec(M, [x, 0, z, 1]);
+  const image = document.querySelector(worker ? '#software' : '#tangent').image;
+  const index = ((799 - Math.round(p[1] / p[3])) * 800 + Math.round(p[0] / p[3])) * 4;
   return Array.from(image.data.slice(index, index + 3));
 }
 
-test.each(['day04', 'day05', 'day06', 'day07', 'day08'])(
-  '%s 保留跨模型深度并分别采样材质',
-  async chapter => {
-    const front = await renderFixture(chapter, false);
-    expect(front[1]).toBeGreaterThan(0);
-    expect(front[0]).toBe(0);
-    const back = await renderFixture(chapter, true);
-    expect(back[0]).toBeGreaterThan(0);
-    expect(back[1]).toBe(0);
-  },
-);
+test('day08 保留跨模型深度并分别采样材质', async () => {
+  const front = await renderFixture('day08', false);
+  expect(front[1]).toBeGreaterThan(0);
+  expect(front[0]).toBe(0);
+  const back = await renderFixture('day08', true);
+  expect(back[0]).toBeGreaterThan(0);
+  expect(back[1]).toBe(0);
+});
 
 test.each(['extra-webgpu', 'extra-webgpu-optimized'])(
   '%s 的 Worker 保留跨模型深度并分别采样材质',

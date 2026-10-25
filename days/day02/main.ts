@@ -91,33 +91,27 @@ function drawLines(canvas: HTMLCanvasElement, drawLine: typeof line) {
 
 // 画出模型的线框
 async function drawObj(canvas: HTMLCanvasElement) {
-  // 头部和双眼是两个独立网格，坐标已经对齐，画到同一张图上即可。
-  const models = await Promise.all([
-    loadModel('/obj/african_head/african_head.obj'),
-    loadModel('/obj/african_head/african_head_eye_inner.obj'),
-  ]);
+  const model = await loadModel('/obj/african_head/african_head.obj');
   const frame = new Frame(width, height);
 
-  for (const model of models) {
-    // 循环模型里的所有三角形
-    for (let i = 0; i < model.nfaces(); i++) {
-      const face = model.face(i);
+  // 循环模型里的所有三角形
+  for (let i = 0; i < model.nfaces(); i++) {
+    const face = model.face(i);
 
-      // 循环三角形的三个顶点，每两个顶点连一条线
-      for (let j = 0; j < 3; j++) {
-        const v0 = model.vert(face[j]);
-        const v1 = model.vert(face[(j + 1) % 3]);
+    // 循环三角形的三个顶点，每两个顶点连一条线
+    for (let j = 0; j < 3; j++) {
+      const v0 = model.vert(face[j]);
+      const v1 = model.vert(face[(j + 1) % 3]);
 
-        // 因为模型空间取值范围是 [-1, 1]^3，我们要把模型坐标平移到屏幕坐标中
-        // 下面 (point + 1) * width(height) / 2 的操作学名为视口变换（Viewport Transformation）
-        const x0 = Math.floor(((v0[0] + 1) * width) / 2);
-        const y0 = Math.floor(((v0[1] + 1) * height) / 2);
-        const x1 = Math.floor(((v1[0] + 1) * width) / 2);
-        const y1 = Math.floor(((v1[1] + 1) * height) / 2);
+      // 因为模型空间取值范围是 [-1, 1]^3，我们要把模型坐标平移到屏幕坐标中
+      // 下面 (point + 1) * width(height) / 2 的操作学名为视口变换（Viewport Transformation）
+      const x0 = Math.floor(((v0[0] + 1) * width) / 2);
+      const y0 = Math.floor(((v0[1] + 1) * height) / 2);
+      const x1 = Math.floor(((v1[0] + 1) * width) / 2);
+      const y1 = Math.floor(((v1[1] + 1) * height) / 2);
 
-        // 画线
-        line(x0, y0, x1, y1, frame, white);
-      }
+      // 画线
+      line(x0, y0, x1, y1, frame, white);
     }
   }
 
