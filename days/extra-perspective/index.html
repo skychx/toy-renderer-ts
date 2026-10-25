@@ -40,6 +40,17 @@
         </figure>
       </div>
     </main>
+    <aside class="chapter-nav">
+      <details>
+        <summary>课程目录</summary>
+        <nav aria-label="章节导航">
+          <a class="home-link" href="/">返回首页</a>
+          <ol data-chapter-links>
+            <li>正在加载目录…</li>
+          </ol>
+        </nav>
+      </details>
+    </aside>
     <script type="module">
       import { runLesson } from '../../shared/lesson';
       await runLesson(() => import('./main.ts'));

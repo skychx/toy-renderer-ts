@@ -26,6 +26,7 @@ GPU 番外使用 [WebGPU](https://developer.mozilla.org/en-US/docs/Web/API/WebGP
 ├── days        # 每一天的代码，每个文件夹都是一份完整的、能单独运行的代码
 ├── obj         # 模型和贴图（来自 tinyrenderer，贴图从 tga 转成了 png）
 ├── scripts     # 准备素材用的脚本
+├── shared      # 页面布局、加载状态和章节导航，不参与渲染计算
 ├── index.html  # 目录页
 └── server.ts   # 本地开发服务器
 ```
@@ -35,6 +36,9 @@ GPU 番外使用 [WebGPU](https://developer.mozilla.org/en-US/docs/Web/API/WebGP
 ```bash
 diff -r days/day04 days/day05
 ```
+
+每页右侧都有章节目录，窄屏下折叠到顶部；目录条目统一维护在 `shared/chapters.ts`。
+画布在 HTML 中声明真实宽高，先显示加载占位，收到各自的首帧通知后再展示结果，避免加载时页面跳动。
 
 ## 软渲染性能对照
 

@@ -2,51 +2,50 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>十天自制软渲染器（TypeScript 版）</title>
-    <style>
-      body {
-        max-width: 720px;
-        margin: 40px auto;
-        padding: 0 16px;
-        font-family: sans-serif;
-        line-height: 1.8;
-      }
-      li {
-        margin-bottom: 4px;
-      }
-      a {
-        color: #1a73e8;
-        text-decoration: none;
-      }
-      span {
-        color: #888;
-      }
-    </style>
+    <link rel="stylesheet" href="./shared/lesson.css" />
   </head>
   <body>
-    <h1>十天自制软渲染器（TypeScript 版）</h1>
-    <!-- prettier-ignore -->
-    <p>配套教程：<a href="https://supercodepower.com/docs/toy-renderer/index">supercodepower.com/docs/toy-renderer</a></p>
-    <ul>
-      <li><a href="/day01">day1：环境搭建</a> <span>画一个点</span></li>
-      <li><a href="/day02">day2：画一条线</a> <span>DDA 和 Bresenham 直线算法</span></li>
-      <li><a href="/day03">day3：画一个三角形</a> <span>叉乘、重心坐标、简单光照</span></li>
-      <li><a href="/day04">day4：Z-buffering</a> <span>深度缓冲、纹理贴图</span></li>
-      <li><a href="/day05">day5：透视投影</a> <span>线性变换、齐次坐标、透视投影矩阵</span></li>
-      <li><a href="/day06">day6：移动相机</a> <span>lookAt、视口变换、Gouraud 着色</span></li>
-      <li><a href="/day07">day7：着色器</a> <span>渲染管线、顶点着色器、片元着色器</span></li>
-      <li><a href="/day08">day8：Phong 光照与法线贴图</a> <span>高光、切线空间</span></li>
-      <li><a href="/day09">day9：阴影</a> <span>Shadow Mapping、shadow acne</span></li>
-      <li><a href="/day10">day10：环境光遮蔽</a> <span>暴力法、SSAO、全家福</span></li>
-      <li><a href="/extra-perspective">番外：透视校正插值</a> <span>修好地板上弯折的格子</span></li>
-      <li><a href="/extra-toon">番外：卡通渲染</a> <span>色阶 + Sobel 描边</span></li>
-      <li>
-        <a href="/extra-webgpu">番外：用 WebGPU 重写一遍</a> <span>把着色器搬到显卡上跑</span>
-      </li>
-      <li>
-        <a href="/extra-webgpu-optimized">番外：软渲染器性能优化</a>
-        <span>对照未优化版本，减少重复计算和临时数组</span>
-      </li>
-    </ul>
+    <main class="home-content">
+      <h1>十天自制软渲染器（TypeScript 版）</h1>
+      <!-- prettier-ignore -->
+      <p>配套教程：<a href="https://supercodepower.com/docs/toy-renderer/index">supercodepower.com/docs/toy-renderer</a></p>
+      <ul>
+        <li><a href="/day01">day1：环境搭建</a> <span>画一个点</span></li>
+        <li><a href="/day02">day2：画一条线</a> <span>DDA 和 Bresenham 直线算法</span></li>
+        <li><a href="/day03">day3：画一个三角形</a> <span>叉乘、重心坐标、简单光照</span></li>
+        <li><a href="/day04">day4：Z-buffering</a> <span>深度缓冲、纹理贴图</span></li>
+        <li><a href="/day05">day5：透视投影</a> <span>线性变换、齐次坐标、透视投影矩阵</span></li>
+        <li><a href="/day06">day6：移动相机</a> <span>lookAt、视口变换、Gouraud 着色</span></li>
+        <li><a href="/day07">day7：着色器</a> <span>渲染管线、顶点着色器、片元着色器</span></li>
+        <li><a href="/day08">day8：Phong 光照与法线贴图</a> <span>高光、切线空间</span></li>
+        <li><a href="/day09">day9：阴影</a> <span>Shadow Mapping、shadow acne</span></li>
+        <li><a href="/day10">day10：环境光遮蔽</a> <span>暴力法、SSAO、全家福</span></li>
+        <li>
+          <a href="/extra-perspective">番外：透视校正插值</a> <span>修好地板上弯折的格子</span>
+        </li>
+        <li><a href="/extra-toon">番外：卡通渲染</a> <span>色阶 + Sobel 描边</span></li>
+        <li>
+          <a href="/extra-webgpu">番外：用 WebGPU 重写一遍</a> <span>把着色器搬到显卡上跑</span>
+        </li>
+        <li>
+          <a href="/extra-webgpu-optimized">番外：软渲染器性能优化</a>
+          <span>对照未优化版本，减少重复计算和临时数组</span>
+        </li>
+      </ul>
+    </main>
+    <aside class="chapter-nav">
+      <details>
+        <summary>课程目录</summary>
+        <nav aria-label="章节导航">
+          <a class="home-link" href="/">返回首页</a>
+          <ol data-chapter-links>
+            <li>正在加载目录…</li>
+          </ol>
+        </nav>
+      </details>
+    </aside>
+    <script type="module" src="./shared/lesson.ts"></script>
   </body>
 </html>

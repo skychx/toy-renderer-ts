@@ -1,3 +1,26 @@
+import { chapters } from './chapters';
+
+// 侧栏的宽度由 CSS 预留；加载目录时不会挤动左侧的教程画布。
+const navigation = document.querySelector('.chapter-nav');
+if (navigation) {
+  const path = window.location.pathname.replace(/\/$/, '') || '/';
+  const list = navigation.querySelector('[data-chapter-links]')!;
+  list.replaceChildren(
+    ...chapters.map(chapter => {
+      const item = document.createElement('li');
+      const link = document.createElement('a');
+      link.href = chapter.path;
+      link.textContent = chapter.title;
+      if (chapter.path === path) link.setAttribute('aria-current', 'page');
+      item.append(link);
+      return item;
+    }),
+  );
+  if (path === '/') navigation.querySelector('.home-link')!.setAttribute('aria-current', 'page');
+  // 桌面展开右侧目录，手机端先折叠，给画布留出空间。
+  navigation.querySelector('details')!.open = window.matchMedia('(min-width: 961px)').matches;
+}
+
 // 页面状态只负责加载提示，不参与各章节的像素计算。
 function setCanvasState(canvas: HTMLCanvasElement, state: 'ready' | 'error', message?: string) {
   const stage = canvas.closest<HTMLElement>('.canvas-stage');
