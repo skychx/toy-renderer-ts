@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "bun server.ts",
+    "test": "bun test",
     "typecheck": "bun check"
   },
   "devDependencies": {

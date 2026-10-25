@@ -37,8 +37,9 @@ GPU 番外使用 [WebGPU](https://developer.mozilla.org/en-US/docs/Web/API/WebGP
 diff -r days/day04 days/day05
 ```
 
-每页右侧都有章节目录，窄屏下折叠到顶部；目录条目统一维护在 `shared/chapters.ts`。
+教程页右侧有章节目录，窄屏下折叠到顶部；首页保留课程列表，目录条目统一维护在 `shared/chapters.ts`。
 画布在 HTML 中声明真实宽高，先显示加载占位，收到各自的首帧通知后再展示结果，避免加载时页面跳动。
+各章节通过外部入口 `page.ts` 启动，再加载 `main.ts`；保持外部 `script src`，让 Bun 正确打包模块导入。
 
 ## 软渲染性能对照
 
