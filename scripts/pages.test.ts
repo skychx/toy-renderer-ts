@@ -20,3 +20,19 @@ test('首页只保留课程列表，不重复显示章节侧栏', async () => {
   expect(html).toContain('href="/day01"');
   expect(html).toContain('href="/extra-webgpu-optimized"');
 });
+
+test('iframe 使用外部入口，并包含单图选择和加载状态', async () => {
+  const result = await Bun.build({ entrypoints: ['embed/index.html'], target: 'browser' });
+  expect(result.success).toBe(true);
+  const code = (
+    await Promise.all(
+      result.outputs.filter(output => output.path.endsWith('.js')).map(output => output.text()),
+    )
+  ).join('\n');
+  expect(code).toContain('mountDemo');
+  expect(code).toContain('demoLoaders');
+  expect(code).toContain('canvas-ready');
+  const html = await Bun.file('embed/index.html').text();
+  expect(html).not.toContain('chapter-nav');
+  expect(html).toContain('width="800" height="800"');
+});

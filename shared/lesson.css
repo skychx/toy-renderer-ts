@@ -108,6 +108,12 @@ figcaption {
   margin-top: 8px;
 }
 
+.demo-link {
+  margin-left: auto;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
 .fps {
   min-width: 9ch;
   padding: 4px 8px;

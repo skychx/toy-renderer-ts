@@ -1,0 +1,36 @@
+:root {
+  scrollbar-gutter: auto;
+  background: #000;
+}
+
+body {
+  display: block;
+  width: 100%;
+  height: 100dvh;
+  padding: 0;
+  overflow: hidden;
+}
+
+main.canvas-stage {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+}
+
+canvas {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.fps {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  pointer-events: none;
+}
+
+.fps[hidden] {
+  display: none;
+}

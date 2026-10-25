@@ -4,9 +4,11 @@
  * 运行 bun dev 之后打开 http://localhost:8080，就能看到每一天的渲染结果
  */
 import home from './index.html';
+import embed from './embed/index.html';
 
 // 目录页挂在根路径上
 const routes: Record<string, Bun.HTMLBundle> = { '/': home };
+routes['/embed/*'] = embed;
 
 // 每一天的页面挂在 /day01、/day02 这样的路径上
 // Bun 会自动编译 html 里引用的 TS 文件，改完代码刷新一下页面就行
@@ -16,7 +18,7 @@ for (const file of new Bun.Glob('days/*/index.html').scanSync()) {
 }
 
 const server = Bun.serve({
-  port: 8080,
+  port: Number(Bun.env.PORT ?? 8080),
   routes,
   development: true,
   // routes 没匹配上的请求都会走到这里

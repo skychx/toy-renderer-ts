@@ -54,6 +54,7 @@ async function renderFixture(chapter: string, hiddenEye: boolean, worker = false
   expect(build.success).toBe(true);
   const code = await build.outputs[0].text();
   const canvases = new Map<string, TestCanvas>();
+  const requests: string[] = [];
   const document = {
     querySelector(id: string) {
       if (!canvases.has(id)) canvases.set(id, new TestCanvas());
@@ -61,6 +62,7 @@ async function renderFixture(chapter: string, hiddenEye: boolean, worker = false
     },
   };
   const fetch = async (url: string) => {
+    requests.push(url);
     const eye = url.includes('eye_inner');
     if (url.endsWith('.obj')) {
       return new Response(
@@ -92,7 +94,7 @@ async function renderFixture(chapter: string, hiddenEye: boolean, worker = false
     'setTimeout',
     'postMessage',
     'onmessage',
-    `${code}\nreturn onmessage;`,
+    `${code.replace(/^export\s*\{[^}]*\};?\s*$/m, '')}\nreturn ${worker ? 'onmessage' : 'demos'};`,
   );
   const onmessage = await execute(
     document,
@@ -106,6 +108,12 @@ async function renderFixture(chapter: string, hiddenEye: boolean, worker = false
     () => {},
     null,
   );
+  if (!worker) {
+    // 导入章节不应开始整章渲染；单图只加载它实际使用的资源。
+    expect(requests).toEqual([]);
+    await onmessage.tangent.run(document.querySelector('#tangent'));
+    expect(requests.some(url => url.includes('diablo') || url.includes('grid'))).toBe(false);
+  }
   const x = hiddenEye ? -0.5 : 0;
   const z = hiddenEye ? -0.3 : 0.3;
   const gl = await import(`../days/${chapter}/gl`);
