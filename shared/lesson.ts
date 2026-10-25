@@ -1,6 +1,6 @@
 import { chapters } from './chapters';
 
-// 侧栏的宽度由 CSS 预留；加载目录时不会挤动左侧的教程画布。
+// 侧栏的宽度由 CSS 预留；加载目录时不会挤动右侧的教程画布。
 const navigation = document.querySelector('.chapter-nav');
 if (navigation) {
   const path = window.location.pathname.replace(/\/$/, '') || '/';
@@ -16,7 +16,7 @@ if (navigation) {
       return item;
     }),
   );
-  // 桌面展开右侧目录，手机端先折叠，给画布留出空间。
+  // 桌面展开左侧目录，手机端先折叠，给画布留出空间。
   navigation.querySelector('details')!.open = window.matchMedia('(min-width: 961px)').matches;
 }
 
