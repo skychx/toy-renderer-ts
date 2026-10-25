@@ -10,5 +10,5 @@
     "isolatedModules": true,
     "skipLibCheck": true
   },
-  "include": ["days", "scripts", "server.ts"]
+  "include": ["days", "shared", "scripts", "server.ts"]
 }

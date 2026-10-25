@@ -2,36 +2,40 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>day2：画一条线</title>
-    <style>
-      body {
-        margin: 24px;
-        font-family: sans-serif;
-      }
-      figure {
-        display: inline-block;
-        margin: 0 24px 24px 0;
-        vertical-align: top;
-      }
-      canvas {
-        border: 1px solid #ddd;
-      }
-    </style>
+    <link rel="stylesheet" href="../../shared/lesson.css" />
   </head>
   <body>
-    <h1>day2：画一条线</h1>
-    <figure>
-      <canvas id="dda"></canvas>
-      <figcaption>DDA 直线算法</figcaption>
-    </figure>
-    <figure>
-      <canvas id="bresenham"></canvas>
-      <figcaption>Bresenham's 直线算法</figcaption>
-    </figure>
-    <figure>
-      <canvas id="obj"></canvas>
-      <figcaption>模型线框</figcaption>
-    </figure>
-    <script type="module" src="./main.ts"></script>
+    <main>
+      <h1>day2：画一条线</h1>
+      <div class="render-grid">
+        <figure>
+          <div class="canvas-stage" aria-busy="true">
+            <canvas id="dda" width="800" height="800"></canvas>
+            <p class="canvas-status" role="status">正在加载模型并渲染…</p>
+          </div>
+          <figcaption>DDA 直线算法</figcaption>
+        </figure>
+        <figure>
+          <div class="canvas-stage" aria-busy="true">
+            <canvas id="bresenham" width="800" height="800"></canvas>
+            <p class="canvas-status" role="status">正在加载模型并渲染…</p>
+          </div>
+          <figcaption>Bresenham's 直线算法</figcaption>
+        </figure>
+        <figure>
+          <div class="canvas-stage" aria-busy="true">
+            <canvas id="obj" width="800" height="800"></canvas>
+            <p class="canvas-status" role="status">正在加载模型并渲染…</p>
+          </div>
+          <figcaption>模型线框</figcaption>
+        </figure>
+      </div>
+    </main>
+    <script type="module">
+      import { runLesson } from '../../shared/lesson';
+      await runLesson(() => import('./main.ts'));
+    </script>
   </body>
 </html>

@@ -55,5 +55,7 @@ export class Frame {
     canvas.width = this.width;
     canvas.height = this.height;
     canvas.getContext('2d')!.putImageData(this.imageData, 0, 0);
+    // 像素已经画好，通知页面移除这张画布的加载提示。
+    canvas.dispatchEvent(new Event('canvas-ready', { bubbles: true }));
   }
 }

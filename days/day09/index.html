@@ -2,40 +2,47 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>day9：阴影</title>
-    <style>
-      body {
-        margin: 24px;
-        font-family: sans-serif;
-      }
-      figure {
-        display: inline-block;
-        margin: 0 24px 24px 0;
-        vertical-align: top;
-      }
-      canvas {
-        border: 1px solid #ddd;
-      }
-    </style>
+    <link rel="stylesheet" href="../../shared/lesson.css" />
   </head>
   <body>
-    <h1>day9：阴影</h1>
-    <figure>
-      <canvas id="depth"></canvas>
-      <figcaption>shadow map：从光源看过去的深度</figcaption>
-    </figure>
-    <figure>
-      <canvas id="no-shadow"></canvas>
-      <figcaption>没有阴影</figcaption>
-    </figure>
-    <figure>
-      <canvas id="no-bias"></canvas>
-      <figcaption>不加 bias：shadow acne</figcaption>
-    </figure>
-    <figure>
-      <canvas id="shadow"></canvas>
-      <figcaption>加上 bias 以后的阴影</figcaption>
-    </figure>
-    <script type="module" src="./main.ts"></script>
+    <main>
+      <h1>day9：阴影</h1>
+      <div class="render-grid">
+        <figure>
+          <div class="canvas-stage" aria-busy="true">
+            <canvas id="depth" width="800" height="800"></canvas>
+            <p class="canvas-status" role="status">正在加载模型并渲染…</p>
+          </div>
+          <figcaption>shadow map：从光源看过去的深度</figcaption>
+        </figure>
+        <figure>
+          <div class="canvas-stage" aria-busy="true">
+            <canvas id="no-shadow" width="800" height="800"></canvas>
+            <p class="canvas-status" role="status">正在加载模型并渲染…</p>
+          </div>
+          <figcaption>没有阴影</figcaption>
+        </figure>
+        <figure>
+          <div class="canvas-stage" aria-busy="true">
+            <canvas id="no-bias" width="800" height="800"></canvas>
+            <p class="canvas-status" role="status">正在加载模型并渲染…</p>
+          </div>
+          <figcaption>不加 bias：shadow acne</figcaption>
+        </figure>
+        <figure>
+          <div class="canvas-stage" aria-busy="true">
+            <canvas id="shadow" width="800" height="800"></canvas>
+            <p class="canvas-status" role="status">正在加载模型并渲染…</p>
+          </div>
+          <figcaption>加上 bias 以后的阴影</figcaption>
+        </figure>
+      </div>
+    </main>
+    <script type="module">
+      import { runLesson } from '../../shared/lesson';
+      await runLesson(() => import('./main.ts'));
+    </script>
   </body>
 </html>

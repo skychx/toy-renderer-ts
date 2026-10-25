@@ -2,36 +2,40 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>day5：透视投影</title>
-    <style>
-      body {
-        margin: 24px;
-        font-family: sans-serif;
-      }
-      figure {
-        display: inline-block;
-        margin: 0 24px 24px 0;
-        vertical-align: top;
-      }
-      canvas {
-        border: 1px solid #ddd;
-      }
-    </style>
+    <link rel="stylesheet" href="../../shared/lesson.css" />
   </head>
   <body>
-    <h1>day5：透视投影</h1>
-    <figure>
-      <canvas id="ortho"></canvas>
-      <figcaption>正交投影</figcaption>
-    </figure>
-    <figure>
-      <canvas id="persp"></canvas>
-      <figcaption>透视投影（直接套相似三角形的公式）</figcaption>
-    </figure>
-    <figure>
-      <canvas id="persp-matrix"></canvas>
-      <figcaption>透视投影（用投影矩阵）</figcaption>
-    </figure>
-    <script type="module" src="./main.ts"></script>
+    <main>
+      <h1>day5：透视投影</h1>
+      <div class="render-grid">
+        <figure>
+          <div class="canvas-stage" aria-busy="true">
+            <canvas id="ortho" width="800" height="800"></canvas>
+            <p class="canvas-status" role="status">正在加载模型并渲染…</p>
+          </div>
+          <figcaption>正交投影</figcaption>
+        </figure>
+        <figure>
+          <div class="canvas-stage" aria-busy="true">
+            <canvas id="persp" width="800" height="800"></canvas>
+            <p class="canvas-status" role="status">正在加载模型并渲染…</p>
+          </div>
+          <figcaption>透视投影（直接套相似三角形的公式）</figcaption>
+        </figure>
+        <figure>
+          <div class="canvas-stage" aria-busy="true">
+            <canvas id="persp-matrix" width="800" height="800"></canvas>
+            <p class="canvas-status" role="status">正在加载模型并渲染…</p>
+          </div>
+          <figcaption>透视投影（用投影矩阵）</figcaption>
+        </figure>
+      </div>
+    </main>
+    <script type="module">
+      import { runLesson } from '../../shared/lesson';
+      await runLesson(() => import('./main.ts'));
+    </script>
   </body>
 </html>

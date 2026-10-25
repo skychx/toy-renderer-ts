@@ -2,36 +2,40 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>day4：Z-buffering</title>
-    <style>
-      body {
-        margin: 24px;
-        font-family: sans-serif;
-      }
-      figure {
-        display: inline-block;
-        margin: 0 24px 24px 0;
-        vertical-align: top;
-      }
-      canvas {
-        border: 1px solid #ddd;
-      }
-    </style>
+    <link rel="stylesheet" href="../../shared/lesson.css" />
   </head>
   <body>
-    <h1>day4：Z-buffering</h1>
-    <figure>
-      <canvas id="zbuffer-model"></canvas>
-      <figcaption>加入 zbuffer 后的渲染结果</figcaption>
-    </figure>
-    <figure>
-      <canvas id="zbuffer-image"></canvas>
-      <figcaption>zbuffer 画成的灰度图</figcaption>
-    </figure>
-    <figure>
-      <canvas id="texture"></canvas>
-      <figcaption>纹理贴图</figcaption>
-    </figure>
-    <script type="module" src="./main.ts"></script>
+    <main>
+      <h1>day4：Z-buffering</h1>
+      <div class="render-grid">
+        <figure>
+          <div class="canvas-stage" aria-busy="true">
+            <canvas id="zbuffer-model" width="800" height="800"></canvas>
+            <p class="canvas-status" role="status">正在加载模型并渲染…</p>
+          </div>
+          <figcaption>加入 zbuffer 后的渲染结果</figcaption>
+        </figure>
+        <figure>
+          <div class="canvas-stage" aria-busy="true">
+            <canvas id="zbuffer-image" width="800" height="800"></canvas>
+            <p class="canvas-status" role="status">正在加载模型并渲染…</p>
+          </div>
+          <figcaption>zbuffer 画成的灰度图</figcaption>
+        </figure>
+        <figure>
+          <div class="canvas-stage" aria-busy="true">
+            <canvas id="texture" width="800" height="800"></canvas>
+            <p class="canvas-status" role="status">正在加载模型并渲染…</p>
+          </div>
+          <figcaption>纹理贴图</figcaption>
+        </figure>
+      </div>
+    </main>
+    <script type="module">
+      import { runLesson } from '../../shared/lesson';
+      await runLesson(() => import('./main.ts'));
+    </script>
   </body>
 </html>

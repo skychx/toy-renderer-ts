@@ -2,41 +2,47 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>day3：画一个三角形</title>
-    <style>
-      body {
-        margin: 24px;
-        font-family: sans-serif;
-      }
-      figure {
-        display: inline-block;
-        margin: 0 24px 24px 0;
-        vertical-align: top;
-      }
-      canvas {
-        border: 1px solid #ddd;
-      }
-    </style>
+    <link rel="stylesheet" href="../../shared/lesson.css" />
   </head>
   <body>
-    <h1>day3：画一个三角形</h1>
-    <figure>
-      <canvas id="cross-product"></canvas>
-      <figcaption>用叉乘画三角形</figcaption>
-    </figure>
-    <figure>
-      <canvas id="barycentric"></canvas>
-      <figcaption>用重心坐标画三角形</figcaption>
-    </figure>
-    <br />
-    <figure>
-      <canvas id="random-colors"></canvas>
-      <figcaption>随机着色</figcaption>
-    </figure>
-    <figure>
-      <canvas id="light"></canvas>
-      <figcaption>简单的光照着色</figcaption>
-    </figure>
-    <script type="module" src="./main.ts"></script>
+    <main>
+      <h1>day3：画一个三角形</h1>
+      <div class="render-grid">
+        <figure style="--figure-width: 200px">
+          <div class="canvas-stage" aria-busy="true">
+            <canvas id="cross-product" width="200" height="200"></canvas>
+            <p class="canvas-status" role="status">正在绘制…</p>
+          </div>
+          <figcaption>用叉乘画三角形</figcaption>
+        </figure>
+        <figure style="--figure-width: 200px">
+          <div class="canvas-stage" aria-busy="true">
+            <canvas id="barycentric" width="200" height="200"></canvas>
+            <p class="canvas-status" role="status">正在绘制…</p>
+          </div>
+          <figcaption>用重心坐标画三角形</figcaption>
+        </figure>
+        <figure>
+          <div class="canvas-stage" aria-busy="true">
+            <canvas id="random-colors" width="800" height="800"></canvas>
+            <p class="canvas-status" role="status">正在加载模型并渲染…</p>
+          </div>
+          <figcaption>随机着色</figcaption>
+        </figure>
+        <figure>
+          <div class="canvas-stage" aria-busy="true">
+            <canvas id="light" width="800" height="800"></canvas>
+            <p class="canvas-status" role="status">正在加载模型并渲染…</p>
+          </div>
+          <figcaption>简单的光照着色</figcaption>
+        </figure>
+      </div>
+    </main>
+    <script type="module">
+      import { runLesson } from '../../shared/lesson';
+      await runLesson(() => import('./main.ts'));
+    </script>
   </body>
 </html>

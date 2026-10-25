@@ -2,41 +2,48 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>day10：环境光遮蔽</title>
-    <style>
-      body {
-        margin: 24px;
-        font-family: sans-serif;
-      }
-      figure {
-        display: inline-block;
-        margin: 0 24px 24px 0;
-        vertical-align: top;
-      }
-      canvas {
-        border: 1px solid #ddd;
-      }
-    </style>
+    <link rel="stylesheet" href="../../shared/lesson.css" />
   </head>
   <body>
-    <h1>day10：环境光遮蔽</h1>
-    <p id="progress"></p>
-    <figure>
-      <canvas id="ao-head"></canvas>
-      <figcaption>暴力法：只有环境光</figcaption>
-    </figure>
-    <figure>
-      <canvas id="ao-head-texture"></canvas>
-      <figcaption>环境光 × 贴图颜色</figcaption>
-    </figure>
-    <figure>
-      <canvas id="ssao"></canvas>
-      <figcaption>SSAO</figcaption>
-    </figure>
-    <figure>
-      <canvas id="final"></canvas>
-      <figcaption>全家福：阴影 + SSAO</figcaption>
-    </figure>
-    <script type="module" src="./main.ts"></script>
+    <main>
+      <h1>day10：环境光遮蔽</h1>
+      <p id="progress" role="status">正在加载模型与贴图…</p>
+      <div class="render-grid">
+        <figure>
+          <div class="canvas-stage" aria-busy="true">
+            <canvas id="ao-head" width="800" height="800"></canvas>
+            <p class="canvas-status" role="status">正在加载模型并渲染…</p>
+          </div>
+          <figcaption>暴力法：只有环境光</figcaption>
+        </figure>
+        <figure>
+          <div class="canvas-stage" aria-busy="true">
+            <canvas id="ao-head-texture" width="800" height="800"></canvas>
+            <p class="canvas-status" role="status">正在加载模型并渲染…</p>
+          </div>
+          <figcaption>环境光 × 贴图颜色</figcaption>
+        </figure>
+        <figure>
+          <div class="canvas-stage" aria-busy="true">
+            <canvas id="ssao" width="800" height="800"></canvas>
+            <p class="canvas-status" role="status">正在加载模型并渲染…</p>
+          </div>
+          <figcaption>SSAO</figcaption>
+        </figure>
+        <figure>
+          <div class="canvas-stage" aria-busy="true">
+            <canvas id="final" width="800" height="800"></canvas>
+            <p class="canvas-status" role="status">正在加载模型并渲染…</p>
+          </div>
+          <figcaption>全家福：阴影 + SSAO</figcaption>
+        </figure>
+      </div>
+    </main>
+    <script type="module">
+      import { runLesson } from '../../shared/lesson';
+      await runLesson(() => import('./main.ts'));
+    </script>
   </body>
 </html>

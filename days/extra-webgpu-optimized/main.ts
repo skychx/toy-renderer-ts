@@ -273,6 +273,7 @@ function showGPUError(message: string) {
   fps.textContent = '不可用';
   status.textContent = message;
   status.hidden = false;
+  canvas.dispatchEvent(new CustomEvent('canvas-error', { bubbles: true, detail: message }));
 }
 
 // 软渲染器在独立的 Worker 里跑，WebGPU 不可用时也能继续展示 CPU 端的结果
@@ -280,7 +281,18 @@ const offscreen = softwareCanvas.transferControlToOffscreen();
 const worker = new Worker('/extra-webgpu-optimized/software.ts', { type: 'module' });
 worker.postMessage({ canvas: offscreen }, [offscreen]);
 worker.onmessage = e => {
-  document.querySelector('#software-fps')!.textContent = `${e.data.fps.toFixed(1)} FPS`;
+  if (e.data.ready) softwareCanvas.dispatchEvent(new Event('canvas-ready', { bubbles: true }));
+  if (typeof e.data.fps === 'number') {
+    document.querySelector('#software-fps')!.textContent = `${e.data.fps.toFixed(1)} FPS`;
+  }
+};
+worker.onerror = () => {
+  softwareCanvas.dispatchEvent(
+    new CustomEvent('canvas-error', {
+      bubbles: true,
+      detail: '软渲染器加载或渲染失败，请刷新页面重试。',
+    }),
+  );
 };
 
 const light: Vec3 = [1, 1, 1];
@@ -322,9 +334,14 @@ window.addEventListener('pointermove', e => {
 // 统计浏览器实际调度的绘制帧数，每 250 毫秒更新；这不是 GPU 的极限吞吐量
 let frames = 0;
 let last = 0;
+let firstFrame = true;
 function loop() {
   if (!draw) return;
   draw(uniforms);
+  if (firstFrame) {
+    canvas.dispatchEvent(new Event('canvas-ready', { bubbles: true }));
+    firstFrame = false;
+  }
   frames++;
   const now = performance.now();
   if (now - last >= 250) {

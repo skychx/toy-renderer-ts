@@ -202,12 +202,17 @@ function render(canvas: OffscreenCanvas, uniforms: Uniforms) {
 // 画完一帧马上接着画下一帧，累计至少 250 毫秒后把帧率告诉主线程
 // 如果一帧本身就超过 250 毫秒，就在这一帧完成后更新
 let frames = 0;
+let firstFrame = true;
 let last: number | null = null;
 function loop() {
   if (canvas && uniforms) {
     // 从真正开始渲染时计时，避免把等待画布和 uniform 的时间算进去
     last ??= performance.now();
     render(canvas, uniforms);
+    if (firstFrame) {
+      postMessage({ ready: true });
+      firstFrame = false;
+    }
     frames++;
     const now = performance.now();
     if (now - last >= 250) {
