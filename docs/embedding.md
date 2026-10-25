@@ -74,12 +74,14 @@ bun install
 bun dev          # 开发：http://localhost:8080
 bun run build    # 生成 dist/
 bun run preview  # 预览：http://localhost:8081
+bun run deploy   # 构建并发布到 Cloudflare
 ```
 
 改动开发路由或 Worker 地址后，需要重启 `bun dev`。占用默认端口时，用 `PORT=8082 bun dev` 或 `PORT=8083 bun run preview` 指定空闲端口。
 
 将 `dist/` 的内容放在独立域名根目录，例如 `https://renderer.example.com/`。构建包含模型、贴图、两个 Worker，以及每个 iframe 地址的真实 `index.html`，无需 SPA 的全站 HTML 回退。
 当前资源路径从根目录 `/obj/`、`/embed/` 开始，不支持直接放进 `/some/subpath/` 子路径。
+本仓库用 Cloudflare Workers 静态资源发布到 `https://toy-renderer.supercodepower.com/`，配置见 `wrangler.jsonc`，自定义域名的 DNS 记录和证书由 Cloudflare 自动创建。首次部署前需全局安装 wrangler 并执行 `wrangler login`。
 
 博客与渲染器都应通过 HTTPS 访问，WebGPU 还要求浏览器和设备支持；不支持时只在对应画布显示错误，CPU 演示仍能运行。
 跨域 iframe 不需要为模型设置 CORS，因为资源由 iframe 内的渲染器站点自己读取。

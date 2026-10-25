@@ -78,7 +78,7 @@ bun run build
 bun run preview  # http://localhost:8081
 ```
 
-将 `dist/` 部署到独立域名的根目录，通过 HTTPS 供博客引用，无需在线运行 Bun。
+将 `dist/` 部署到独立域名的根目录，通过 HTTPS 供博客引用，无需在线运行 Bun；`bun run deploy` 会构建并发布到 `https://toy-renderer.supercodepower.com/`。
 开发服务器默认用 8080，预览默认用 8081，均可通过 `PORT=8082 bun dev` 这样的方式指定其他端口。
 更多地址、架构约定和部署配置见 [iframe 嵌入说明](docs/embedding.md)。
 
