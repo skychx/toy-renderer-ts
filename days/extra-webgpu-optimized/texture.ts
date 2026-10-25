@@ -16,12 +16,17 @@ export class Texture {
     this.data = data;
   }
 
-  // 根据 uv 坐标取颜色，u、v 的取值范围都是 [0, 1]
-  get(u: number, v: number): Color {
+  // 把 uv 转成 RGBA 数组下标；尺寸相同的贴图可以共用这个结果
+  index(u: number, v: number): number {
     // uv 坐标的原点在图片的左下角，而图片的像素是从上往下存的，所以 v 要翻转一下
     const x = Math.min(this.width - 1, Math.max(0, Math.floor(u * this.width)));
     const y = Math.min(this.height - 1, Math.max(0, Math.floor((1 - v) * this.height)));
-    const i = (y * this.width + x) * 4;
+    return (y * this.width + x) * 4;
+  }
+
+  // 根据 uv 坐标取颜色，u、v 的取值范围都是 [0, 1]
+  get(u: number, v: number): Color {
+    const i = this.index(u, v);
     return [this.data[i], this.data[i + 1], this.data[i + 2]];
   }
 }

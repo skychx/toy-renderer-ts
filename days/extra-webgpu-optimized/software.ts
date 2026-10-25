@@ -12,19 +12,16 @@ import {
   Vec2,
   Vec3,
   Vec4,
-  add,
-  dot,
   interpolate,
   inverse,
   matMul,
   matVec,
   normalize,
-  scale,
   sub,
   transformDirection,
 } from './math';
 import { loadModel } from './model';
-import { Texture, loadTexture } from './texture';
+import { loadTexture } from './texture';
 
 // 主线程发来的消息：一开始是画布，之后相机每动一下，就发来一份新的 uniform
 let canvas: OffscreenCanvas | null = null;
@@ -39,11 +36,12 @@ const diffuseMap = await loadTexture('/obj/african_head/african_head_diffuse.png
 const normalMap = await loadTexture('/obj/african_head/african_head_nm_tangent.png');
 const specularMap = await loadTexture('/obj/african_head/african_head_spec.png');
 
-// 从法线贴图里读出法线：颜色每个分量的范围是 [0, 255]，法线每个分量的范围是 [-1, 1]
-function sampleNormal(texture: Texture, uv: Vec2): Vec3 {
-  const [r, g, b] = texture.get(uv[0], uv[1]);
-  return normalize([(r / 255) * 2 - 1, (g / 255) * 2 - 1, (b / 255) * 2 - 1]);
-}
+// 从法线贴图里取值时，尺寸相同就能复用漫反射贴图的像素下标
+// 在加载后检查一次；以后换成不同尺寸的贴图，也能各自按 uv 寻址
+const normalMatchesDiffuse =
+  normalMap.width === diffuseMap.width && normalMap.height === diffuseMap.height;
+const specularMatchesDiffuse =
+  specularMap.width === diffuseMap.width && specularMap.height === diffuseMap.height;
 
 // 和 WGSL 着色器做一样的事：切线空间的法线贴图 + Phong 光照，基本就是 day8 的 TangentShader
 class PhongShader implements IShader {
@@ -103,35 +101,84 @@ class PhongShader implements IShader {
   }
 
   fragment(bar: Vec3): Color | null {
-    const uv = interpolate(this.varyingUV, bar);
-    // 插值出来的顶点法线，切线空间的 z 轴，仍然需要逐像素计算
-    const n = normalize(interpolate(this.varyingNormal, bar));
-    let perturbed = n;
+    // Before：每张贴图都对同一个 uv 做取整、限幅，再创建 RGB 数组
+    // After：同尺寸时共用下标，直接读通道；uv 插值也不再创建临时数组
+    const [uv0, uv1, uv2] = this.varyingUV;
+    const u = uv0[0] * bar[0] + uv1[0] * bar[1] + uv2[0] * bar[2];
+    const v = uv0[1] * bar[0] + uv1[1] * bar[1] + uv2[1] * bar[2];
+    const index = diffuseMap.index(u, v);
+    // Before：interpolate/scale/add/normalize 为每个中间向量创建一个新数组
+    // After：热点计算直接用 x、y、z 分量，公式和运算顺序保持一致
+    // 插值并归一化顶点法线 n：切线空间的 z 轴，仍然逐像素计算
+    const [a, b, c] = this.varyingNormal;
+    let nx = a[0] * bar[0] + b[0] * bar[1] + c[0] * bar[2];
+    let ny = a[1] * bar[0] + b[1] * bar[1] + c[1] * bar[2];
+    let nz = a[2] * bar[0] + b[2] * bar[1] + c[2] * bar[2];
+    const normalLength = Math.sqrt(nx * nx + ny * ny + nz * nz);
+    nx /= normalLength;
+    ny /= normalLength;
+    nz /= normalLength;
+
+    // p 是法线贴图扰动后的单位法线；uv 退化时，直接使用 n
+    let px = nx,
+      py = ny,
+      pz = nz;
     if (this.tangentBasis) {
       const [T, B] = this.tangentBasis;
-      // 切线空间里的法线 (x, y, z)，意思是 x 个 t 加 y 个 b 再加 z 个 n
-      const nm = sampleNormal(normalMap, uv);
-      perturbed = normalize(add(add(scale(T, nm[0]), scale(B, nm[1])), scale(n, nm[2])));
+      const normalIndex = normalMatchesDiffuse ? index : normalMap.index(u, v);
+      // nm = normalize(rgb / 255 * 2 - 1)：直接用分量解码，省掉中间数组
+      let nmx = (normalMap.data[normalIndex] / 255) * 2 - 1;
+      let nmy = (normalMap.data[normalIndex + 1] / 255) * 2 - 1;
+      let nmz = (normalMap.data[normalIndex + 2] / 255) * 2 - 1;
+      const nmLength = Math.sqrt(nmx * nmx + nmy * nmy + nmz * nmz);
+      nmx /= nmLength;
+      nmy /= nmLength;
+      nmz /= nmLength;
+      // p = normalize(T * nm.x + B * nm.y + n * nm.z)
+      px = T[0] * nmx + B[0] * nmy + nx * nmz;
+      py = T[1] * nmx + B[1] * nmy + ny * nmz;
+      pz = T[2] * nmx + B[2] * nmy + nz * nmz;
+      const len = Math.sqrt(px * px + py * py + pz * pz);
+      px /= len;
+      py /= len;
+      pz /= len;
     }
 
     // Phong 光照模型
     const l = normalize(this.uniforms.light);
-    // 反射光的方向：r = 2n(n·l) - l
-    const r = normalize(sub(scale(perturbed, 2 * dot(perturbed, l)), l));
-    // 相机在原点，从物体指向相机的方向就是这个像素位置的反方向
-    const v = normalize(scale(interpolate(this.varyingTri, bar), -1));
+    const dotNL = px * l[0] + py * l[1] + pz * l[2];
+    // 反射方向 r = normalize(2p(p·l) - l)，省掉 scale/sub/normalize 的中间数组
+    const factor = 2 * dotNL;
+    let rx = px * factor - l[0],
+      ry = py * factor - l[1],
+      rz = pz * factor - l[2];
+    const reflectionLength = Math.sqrt(rx * rx + ry * ry + rz * rz);
+    rx /= reflectionLength;
+    ry /= reflectionLength;
+    rz /= reflectionLength;
+
+    // 相机在原点，v = normalize(-position)，只保留插值结果这一个数组
+    const position = interpolate(this.varyingTri, bar);
+    let vx = position[0] * -1,
+      vy = position[1] * -1,
+      vz = position[2] * -1;
+    const viewLength = Math.sqrt(vx * vx + vy * vy + vz * vz);
+    vx /= viewLength;
+    vy /= viewLength;
+    vz /= viewLength;
 
     const ambient = 0.3;
-    const diffuse = Math.max(0, dot(perturbed, l));
-    const strength = specularMap.get(uv[0], uv[1])[0] / 255;
-    const specular = strength * Math.pow(Math.max(0, dot(r, v)), 20);
+    const diffuse = Math.max(0, dotNL);
+    const specularIndex = specularMatchesDiffuse ? index : specularMap.index(u, v);
+    const strength = specularMap.data[specularIndex] / 255;
+    const specular = strength * Math.pow(Math.max(0, rx * vx + ry * vy + rz * vz), 20);
 
     // 颜色超过 255 的部分，存进 imageData 的时候会自动截断，和显卡一样
-    const color = diffuseMap.get(uv[0], uv[1]);
+    const color = diffuseMap.data;
     return [
-      color[0] * (ambient + diffuse) + 255 * specular,
-      color[1] * (ambient + diffuse) + 255 * specular,
-      color[2] * (ambient + diffuse) + 255 * specular,
+      color[index] * (ambient + diffuse) + 255 * specular,
+      color[index + 1] * (ambient + diffuse) + 255 * specular,
+      color[index + 2] * (ambient + diffuse) + 255 * specular,
     ];
   }
 }
