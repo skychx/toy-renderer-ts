@@ -19,6 +19,10 @@ body {
   line-height: 1.6;
 }
 
+.home-page {
+  display: block;
+}
+
 main {
   grid-column: 1;
   grid-row: 1;

@@ -16,7 +16,6 @@ if (navigation) {
       return item;
     }),
   );
-  if (path === '/') navigation.querySelector('.home-link')!.setAttribute('aria-current', 'page');
   // 桌面展开右侧目录，手机端先折叠，给画布留出空间。
   navigation.querySelector('details')!.open = window.matchMedia('(min-width: 961px)').matches;
 }
