@@ -1,0 +1,9 @@
+{
+  "name": "toy-renderer",
+  "compatibility_date": "2026-10-19",
+  // 只托管 bun run build 生成的静态文件，不运行 Worker 代码。
+  "assets": { "directory": "./dist" },
+  // 自定义域名会自动创建 DNS 记录和 HTTPS 证书；不额外开放 workers.dev 地址。
+  "routes": [{ "pattern": "toy-renderer.supercodepower.com", "custom_domain": true }],
+  "workers_dev": false,
+}
