@@ -4,6 +4,8 @@
   "type": "module",
   "scripts": {
     "dev": "bun server.ts",
+    "build": "bun scripts/build.ts",
+    "preview": "bun scripts/preview.ts",
     "test": "bun test",
     "typecheck": "bun check"
   },

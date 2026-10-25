@@ -5,10 +5,16 @@
  */
 import home from './index.html';
 import embed from './embed/index.html';
+import { getDemoEntries } from './shared/catalog';
 
 // 目录页挂在根路径上
-const routes: Record<string, Bun.HTMLBundle> = { '/': home };
-routes['/embed/*'] = embed;
+const routes: Record<string, Bun.HTMLBundle | Response> = { '/': home };
+const entries = await getDemoEntries();
+for (const entry of entries) {
+  routes[entry.path] = embed;
+  routes[entry.path.slice(0, -1)] = embed;
+}
+routes['/embeds.json'] = Response.json(entries);
 
 // 每一天的页面挂在 /day01、/day02 这样的路径上
 // Bun 会自动编译 html 里引用的 TS 文件，改完代码刷新一下页面就行
@@ -35,12 +41,16 @@ const server = Bun.serve({
         return new Response(file);
       }
     }
-    // Web Worker 用的 TS 文件（比如 /extra-webgpu/software.ts）：
+    // Worker 地址在开发和部署时都使用 .js：
     // Bun 打包 html 的时候不会处理 new Worker()，所以在这里现场打包一下再返回
     if (['/extra-webgpu/software.js', '/extra-webgpu-optimized/software.js'].includes(path)) {
-      const { outputs } = await Bun.build({
+      const { outputs, success, logs } = await Bun.build({
         entrypoints: [`./days${path.replace(/\.js$/, '.ts')}`],
       });
+      if (!success) {
+        console.error(logs);
+        return new Response('Worker build failed', { status: 500 });
+      }
       return new Response(outputs[0]);
     }
     return new Response('Not Found', { status: 404 });

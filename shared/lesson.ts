@@ -33,7 +33,7 @@ export async function runLesson(load: () => Promise<DemoModule>) {
       if (!demo) throw new Error(`演示 ${canvas.id} 尚未登记。`);
       const link = document.createElement('a');
       link.className = 'demo-link';
-      link.href = `/embed${location.pathname.replace(/\/$/, '')}/${canvas.id}`;
+      link.href = `/embed${location.pathname.replace(/\/$/, '')}/${canvas.id}/`;
       link.textContent = '单独查看';
       link.setAttribute('aria-label', `单独查看：${demo.title}`);
       canvas.closest('figure')?.querySelector('figcaption')?.append(link);

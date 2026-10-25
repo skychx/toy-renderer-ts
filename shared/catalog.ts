@@ -17,3 +17,22 @@ export const demoLoaders: Record<string, () => Promise<DemoModule>> = {
   'extra-webgpu': () => import('../days/extra-webgpu/main'),
   'extra-webgpu-optimized': () => import('../days/extra-webgpu-optimized/main'),
 };
+
+// 清单只读取元信息，不调用 run，也不请求模型；开发路由与静态构建共用。
+export async function getDemoEntries() {
+  const chapters = await Promise.all(
+    Object.entries(demoLoaders).map(async ([chapter, load]) => {
+      const { demos } = await load();
+      return Object.entries(demos).map(([id, demo]) => ({
+        chapter,
+        id,
+        title: demo.title,
+        width: demo.width,
+        height: demo.height,
+        animated: !!demo.animated,
+        path: `/embed/${chapter}/${id}/`,
+      }));
+    }),
+  );
+  return chapters.flat();
+}
