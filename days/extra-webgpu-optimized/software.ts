@@ -1,7 +1,7 @@
 /**
  * 软渲染器：和 main.ts 里的 WebGPU 画同一个人头，放在 Web Worker 里跑
  *
- * 这里保留逐像素的直观写法，作为下一篇性能优化番外的基线。
+ * 以 extra-webgpu 为基线，只优化 CPU 热点，保持相同的分辨率、相机和光照。
  * Worker 把 CPU 渲染和主线程分开，避免拖慢 WebGPU 的绘图和鼠标交互。
  */
 import { Color, Frame } from './frame';
@@ -63,6 +63,7 @@ class PhongShader implements IShader {
     [0, 0, 0],
     [0, 0, 0],
   ]; // 三角形的三个顶点（相机坐标系）
+  tangentBasis: [Vec3, Vec3] | null = null; // 当前三角形的单位切线 T 和副切线 B
 
   constructor(uniforms: Uniforms) {
     this.uniforms = uniforms;
@@ -81,11 +82,11 @@ class PhongShader implements IShader {
     return matVec(this.uniforms.Projection, p);
   }
 
-  fragment(bar: Vec3): Color | null {
-    const uv = interpolate(this.varyingUV, bar);
-    // 插值出来的顶点法线，切线空间的 z 轴
-    const n = normalize(interpolate(this.varyingNormal, bar));
-
+  // Before：在 fragment() 里，每个像素都重复求逆矩阵和切线基
+  // After：这些量只取决于三角形的三个顶点和 uv，三个顶点处理完后算一次即可
+  prepareTriangle() {
+    // 先清掉上一个三角形的结果，避免 uv 退化时误用它的切线基
+    this.tangentBasis = null;
     // 用三角形的两条边和对应的 uv 差，求出切线 t 和副切线 b
     const [p0, p1, p2] = this.varyingTri;
     const [uv0, uv1, uv2] = this.varyingUV;
@@ -94,14 +95,22 @@ class PhongShader implements IShader {
       [uv1[0] - uv0[0], uv1[1] - uv0[1]],
       [uv2[0] - uv0[0], uv2[1] - uv0[1]],
     ];
-    let perturbed = n;
-    // uv 三角形退化成了一条线（面积为 0）时没法算切线，直接用插值出来的法线
+    // uv 三角形退化成了一条线时保留 null，让 fragment() 使用插值法线
     if (Math.abs(U[0][0] * U[1][1] - U[0][1] * U[1][0]) > 1e-12) {
       const [t, b] = matMul(inverse(U), E);
+      this.tangentBasis = [normalize(t as Vec3), normalize(b as Vec3)];
+    }
+  }
+
+  fragment(bar: Vec3): Color | null {
+    const uv = interpolate(this.varyingUV, bar);
+    // 插值出来的顶点法线，切线空间的 z 轴，仍然需要逐像素计算
+    const n = normalize(interpolate(this.varyingNormal, bar));
+    let perturbed = n;
+    if (this.tangentBasis) {
+      const [T, B] = this.tangentBasis;
       // 切线空间里的法线 (x, y, z)，意思是 x 个 t 加 y 个 b 再加 z 个 n
       const nm = sampleNormal(normalMap, uv);
-      const T = normalize(t as Vec3);
-      const B = normalize(b as Vec3);
       perturbed = normalize(add(add(scale(T, nm[0]), scale(B, nm[1])), scale(n, nm[2])));
     }
 
@@ -137,6 +146,7 @@ function render(canvas: OffscreenCanvas, uniforms: Uniforms) {
   const shader = new PhongShader(uniforms);
   for (let i = 0; i < model.nfaces(); i++) {
     const clip: Vec4[] = [shader.vertex(i, 0), shader.vertex(i, 1), shader.vertex(i, 2)];
+    shader.prepareTriangle();
     triangle(clip, shader, Viewport, zbuffer, frame);
   }
   canvas.getContext('2d')!.putImageData(frame.imageData, 0, 0);
