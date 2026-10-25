@@ -392,7 +392,11 @@ function getCanvas(id: string) {
   return document.querySelector<HTMLCanvasElement>(`#${id}`)!;
 }
 
-const head = await loadAsset('/obj/african_head/african_head');
+const head = await Promise.all([
+  loadAsset('/obj/african_head/african_head'),
+  loadAsset('/obj/african_head/african_head_eye_inner'),
+]);
+const headModels = head.map(asset => asset.model);
 const diablo = await loadAsset('/obj/diablo3_pose/diablo3_pose');
 const floor = await loadAsset('/obj/floor');
 const progress = document.querySelector('#progress')!;
@@ -400,7 +404,8 @@ const progress = document.querySelector('#progress')!;
 // 1. 暴力法：先从 256 个方向各渲染一张 shadow map，再让每个像素挨个检查自己有没有被挡住
 const shadowMaps: ShadowMap[] = [];
 for (let i = 0; i < 256; i++) {
-  shadowMaps.push(createShadowMap([head.model], randomSphereDirection()));
+  // 生成 shadow map 时也要包含眼球，环境光遮蔽才能考虑眼睑与眼球之间的遮挡。
+  shadowMaps.push(createShadowMap(headModels, randomSphereDirection()));
   if (i % 8 === 0) {
     progress.textContent = `正在渲染 shadow map：${i} / 256`;
     await new Promise(resolve => setTimeout(resolve)); // 让浏览器喘口气，更新一下进度
@@ -410,14 +415,20 @@ progress.textContent = '正在计算环境光遮蔽';
 await new Promise(resolve => setTimeout(resolve));
 
 const headUniforms = createUniforms(eye);
-for (const [id, diffuse] of [
-  ['ao-head', null],
-  ['ao-head-texture', head.diffuse],
+for (const [id, textured] of [
+  ['ao-head', false],
+  ['ao-head-texture', true],
 ] as const) {
   const frame = new Frame(width, height);
   const zbuffer = new Float32Array(width * height).fill(-Infinity);
-  const shader = new BruteForceAOShader(head.model, headUniforms, shadowMaps, diffuse);
-  render([[head.model, shader]], frame, zbuffer);
+  render(
+    head.map(({ model, diffuse }) => [
+      model,
+      new BruteForceAOShader(model, headUniforms, shadowMaps, textured ? diffuse : null),
+    ]),
+    frame,
+    zbuffer,
+  );
   frame.render(getCanvas(id));
 }
 

@@ -23,7 +23,7 @@ import {
   sub,
   transformDirection,
 } from './math';
-import { loadModel } from './model';
+import { Model, loadModel } from './model';
 import { Texture, loadTexture } from './texture';
 
 // 主线程发来的消息：一开始是画布，之后相机每动一下，就发来一份新的 uniform
@@ -34,10 +34,22 @@ onmessage = (e: MessageEvent) => {
   if (e.data.uniforms) uniforms = e.data.uniforms;
 };
 
-const model = await loadModel('/obj/african_head/african_head.obj');
-const diffuseMap = await loadTexture('/obj/african_head/african_head_diffuse.png');
-const normalMap = await loadTexture('/obj/african_head/african_head_nm_tangent.png');
-const specularMap = await loadTexture('/obj/african_head/african_head_spec.png');
+type Asset = {
+  model: Model;
+  diffuseMap: Texture;
+  normalMap: Texture;
+  specularMap: Texture;
+};
+
+// 双眼网格已经位于头部的坐标系中，但 UV 和材质需要单独加载。
+const assets: Asset[] = await Promise.all(
+  ['african_head', 'african_head_eye_inner'].map(async name => ({
+    model: await loadModel(`/obj/african_head/${name}.obj`),
+    diffuseMap: await loadTexture(`/obj/african_head/${name}_diffuse.png`),
+    normalMap: await loadTexture(`/obj/african_head/${name}_nm_tangent.png`),
+    specularMap: await loadTexture(`/obj/african_head/${name}_spec.png`),
+  })),
+);
 
 // 从法线贴图里读出法线：颜色每个分量的范围是 [0, 255]，法线每个分量的范围是 [-1, 1]
 function sampleNormal(texture: Texture, uv: Vec2): Vec3 {
@@ -47,6 +59,7 @@ function sampleNormal(texture: Texture, uv: Vec2): Vec3 {
 
 // 和 WGSL 着色器做一样的事：切线空间的法线贴图 + Phong 光照，基本就是 day8 的 TangentShader
 class PhongShader implements IShader {
+  asset: Asset;
   uniforms: Uniforms;
   varyingUV: Vec2[] = [
     [0, 0],
@@ -64,11 +77,13 @@ class PhongShader implements IShader {
     [0, 0, 0],
   ]; // 三角形的三个顶点（相机坐标系）
 
-  constructor(uniforms: Uniforms) {
+  constructor(asset: Asset, uniforms: Uniforms) {
+    this.asset = asset;
     this.uniforms = uniforms;
   }
 
   vertex(iface: number, nthvert: number): Vec4 {
+    const { model } = this.asset;
     this.varyingUV[nthvert] = model.uv(iface, nthvert);
     this.varyingNormal[nthvert] = transformDirection(
       this.uniforms.ModelViewIT,
@@ -82,6 +97,7 @@ class PhongShader implements IShader {
   }
 
   fragment(bar: Vec3): Color | null {
+    const { diffuseMap, normalMap, specularMap } = this.asset;
     const uv = interpolate(this.varyingUV, bar);
     // 插值出来的顶点法线，切线空间的 z 轴
     const n = normalize(interpolate(this.varyingNormal, bar));
@@ -134,10 +150,14 @@ function render(canvas: OffscreenCanvas, uniforms: Uniforms) {
   // OpenGL 里 z 越小离相机越近，所以 zbuffer 一开始要填成无穷远
   const zbuffer = new Float32Array(width * height).fill(Infinity);
   const Viewport = viewport(0, 0, width, height);
-  const shader = new PhongShader(uniforms);
-  for (let i = 0; i < model.nfaces(); i++) {
-    const clip: Vec4[] = [shader.vertex(i, 0), shader.vertex(i, 1), shader.vertex(i, 2)];
-    triangle(clip, shader, Viewport, zbuffer, frame);
+  // 每帧只清空一次：切换到眼球时保留头部的深度，避免穿过眼睑。
+  for (const asset of assets) {
+    const { model } = asset;
+    const shader = new PhongShader(asset, uniforms);
+    for (let i = 0; i < model.nfaces(); i++) {
+      const clip: Vec4[] = [shader.vertex(i, 0), shader.vertex(i, 1), shader.vertex(i, 2)];
+      triangle(clip, shader, Viewport, zbuffer, frame);
+    }
   }
   canvas.getContext('2d')!.putImageData(frame.imageData, 0, 0);
 }

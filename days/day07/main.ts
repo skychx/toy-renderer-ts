@@ -1,8 +1,8 @@
 import { Frame, Color } from './frame';
 import { IShader, lookAt, projection, triangle, viewport } from './gl';
 import { Vec2, Vec3, Vec4, dot, length, matMul, matVec, normalize, sub } from './math';
-import { loadModel } from './model';
-import { loadTexture } from './texture';
+import { Model, loadModel } from './model';
+import { Texture, loadTexture } from './texture';
 
 const width = 800;
 const height = 800;
@@ -16,21 +16,30 @@ const ModelView = lookAt(eye, center, up);
 const Projection = projection(length(sub(eye, center)));
 const Viewport = viewport(width / 8, height / 8, (width * 3) / 4, (height * 3) / 4);
 
-const model = await loadModel('/obj/african_head/african_head.obj');
-const texture = await loadTexture('/obj/african_head/african_head_diffuse.png');
+const assets = await Promise.all(
+  ['african_head', 'african_head_eye_inner'].map(async name => ({
+    model: await loadModel(`/obj/african_head/${name}.obj`),
+    texture: await loadTexture(`/obj/african_head/${name}_diffuse.png`),
+  })),
+);
 
 // Gouraud 着色器
 class GouraudShader implements IShader {
+  model: Model;
   // uniform：对所有顶点、所有像素都一样的数据
   uniformM = matMul(Projection, ModelView);
   // varying：顶点着色器写进去，片元着色器读出来（读之前要先插值）
   varyingIntensity: Vec3 = [0, 0, 0];
 
+  constructor(model: Model) {
+    this.model = model;
+  }
+
   vertex(iface: number, nthvert: number): Vec4 {
     // 算出这个顶点的光照强度，存到 varying 里
-    this.varyingIntensity[nthvert] = Math.max(0, dot(model.normal(iface, nthvert), light));
+    this.varyingIntensity[nthvert] = Math.max(0, dot(this.model.normal(iface, nthvert), light));
     // 把顶点变换到裁剪坐标
-    const v = model.vert(iface, nthvert);
+    const v = this.model.vert(iface, nthvert);
     return matVec(this.uniformM, [v[0], v[1], v[2], 1] as Vec4);
   }
 
@@ -57,6 +66,8 @@ class ToonShader extends GouraudShader {
 
 // Gouraud 着色 + 纹理
 class TextureShader implements IShader {
+  model: Model;
+  texture: Texture;
   uniformM = matMul(Projection, ModelView);
   varyingIntensity: Vec3 = [0, 0, 0];
   varyingUV: Vec2[] = [
@@ -65,10 +76,15 @@ class TextureShader implements IShader {
     [0, 0],
   ];
 
+  constructor(model: Model, texture: Texture) {
+    this.model = model;
+    this.texture = texture;
+  }
+
   vertex(iface: number, nthvert: number): Vec4 {
-    this.varyingUV[nthvert] = model.uv(iface, nthvert);
-    this.varyingIntensity[nthvert] = Math.max(0, dot(model.normal(iface, nthvert), light));
-    const v = model.vert(iface, nthvert);
+    this.varyingUV[nthvert] = this.model.uv(iface, nthvert);
+    this.varyingIntensity[nthvert] = Math.max(0, dot(this.model.normal(iface, nthvert), light));
+    const v = this.model.vert(iface, nthvert);
     return matVec(this.uniformM, [v[0], v[1], v[2], 1] as Vec4);
   }
 
@@ -78,25 +94,37 @@ class TextureShader implements IShader {
     const [uv0, uv1, uv2] = this.varyingUV;
     const u = uv0[0] * bar[0] + uv1[0] * bar[1] + uv2[0] * bar[2];
     const v = uv0[1] * bar[0] + uv1[1] * bar[1] + uv2[1] * bar[2];
-    const color = texture.get(u, v);
+    const color = this.texture.get(u, v);
     return [color[0] * intensity, color[1] * intensity, color[2] * intensity];
   }
 }
 
 // 渲染：每个三角形先对三个顶点调用顶点着色器，再交给光栅化，光栅化会对每个像素调用片元着色器
-function render(shader: IShader, canvas: HTMLCanvasElement) {
+function render(items: [Model, IShader][], canvas: HTMLCanvasElement) {
   const frame = new Frame(width, height);
   const zbuffer = new Float32Array(width * height).fill(-Infinity);
 
-  for (let i = 0; i < model.nfaces(); i++) {
-    // 图元装配：三个顶点组成一个三角形
-    const clip: Vec4[] = [shader.vertex(i, 0), shader.vertex(i, 1), shader.vertex(i, 2)];
-    triangle(clip, shader, Viewport, zbuffer, frame);
+  // 每个模型有自己的着色器数据，同一张图共用帧缓冲和 zbuffer。
+  for (const [model, shader] of items) {
+    for (let i = 0; i < model.nfaces(); i++) {
+      // 图元装配：三个顶点组成一个三角形
+      const clip: Vec4[] = [shader.vertex(i, 0), shader.vertex(i, 1), shader.vertex(i, 2)];
+      triangle(clip, shader, Viewport, zbuffer, frame);
+    }
   }
 
   frame.render(canvas);
 }
 
-render(new GouraudShader(), document.querySelector<HTMLCanvasElement>('#gouraud')!);
-render(new ToonShader(), document.querySelector<HTMLCanvasElement>('#toon')!);
-render(new TextureShader(), document.querySelector<HTMLCanvasElement>('#texture')!);
+render(
+  assets.map(({ model }) => [model, new GouraudShader(model)]),
+  document.querySelector<HTMLCanvasElement>('#gouraud')!,
+);
+render(
+  assets.map(({ model }) => [model, new ToonShader(model)]),
+  document.querySelector<HTMLCanvasElement>('#toon')!,
+);
+render(
+  assets.map(({ model, texture }) => [model, new TextureShader(model, texture)]),
+  document.querySelector<HTMLCanvasElement>('#texture')!,
+);

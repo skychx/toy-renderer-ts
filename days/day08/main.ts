@@ -227,13 +227,22 @@ class TangentShader implements IShader {
 }
 
 // 渲染：每个三角形先对三个顶点调用顶点着色器，再交给光栅化
-function render(model: Model, shader: IShader, canvas: HTMLCanvasElement) {
+function render(
+  assets: Asset[],
+  createShader: (asset: Asset) => IShader,
+  canvas: HTMLCanvasElement,
+) {
   const frame = new Frame(width, height);
   const zbuffer = new Float32Array(width * height).fill(-Infinity);
 
-  for (let i = 0; i < model.nfaces(); i++) {
-    const clip: Vec4[] = [shader.vertex(i, 0), shader.vertex(i, 1), shader.vertex(i, 2)];
-    triangle(clip, shader, Viewport, zbuffer, frame);
+  // 每个网格绑定自己的材质，所有网格共用同一个深度缓冲。
+  for (const asset of assets) {
+    const { model } = asset;
+    const shader = createShader(asset);
+    for (let i = 0; i < model.nfaces(); i++) {
+      const clip: Vec4[] = [shader.vertex(i, 0), shader.vertex(i, 1), shader.vertex(i, 2)];
+      triangle(clip, shader, Viewport, zbuffer, frame);
+    }
   }
 
   frame.render(canvas);
@@ -243,7 +252,10 @@ function getCanvas(id: string) {
   return document.querySelector<HTMLCanvasElement>(`#${id}`)!;
 }
 
-const head = await loadAsset('/obj/african_head/african_head');
+const head = await Promise.all([
+  loadAsset('/obj/african_head/african_head'),
+  loadAsset('/obj/african_head/african_head_eye_inner'),
+]);
 const diablo = await loadAsset('/obj/diablo3_pose/diablo3_pose');
 const grid = await loadTexture('/obj/grid.png');
 // 一张 1x1 的浅灰色贴图：用它当漫反射贴图，就能只看光照、不看颜色
@@ -252,35 +264,35 @@ const gray = new Texture(1, 1, new Uint8ClampedArray([190, 190, 190, 255]));
 const uniforms = createUniforms([1, 1, 3], [1, 1, 1]);
 
 // 1. 模型空间的法线贴图
-render(head.model, new NormalMapShader(head, uniforms), getCanvas('normal-map'));
+render(head, asset => new NormalMapShader(asset, uniforms), getCanvas('normal-map'));
 
 // 2. Phong 光照的三个分量，以及把它们加起来的效果
-const grayHead = { ...head, diffuse: gray };
+const grayHead = head.map(asset => ({ ...asset, diffuse: gray }));
 render(
-  head.model,
-  new PhongShader(grayHead, uniforms, { ambient: 0.3, diffuse: 0, specular: 0 }),
+  grayHead,
+  asset => new PhongShader(asset, uniforms, { ambient: 0.3, diffuse: 0, specular: 0 }),
   getCanvas('ambient'),
 );
 render(
-  head.model,
-  new PhongShader(grayHead, uniforms, { ambient: 0, diffuse: 1, specular: 0 }),
+  grayHead,
+  asset => new PhongShader(asset, uniforms, { ambient: 0, diffuse: 1, specular: 0 }),
   getCanvas('diffuse'),
 );
 render(
-  head.model,
+  grayHead,
   // 高光单独看太暗了，放大 3 倍方便观察
-  new PhongShader(grayHead, uniforms, { ambient: 0, diffuse: 0, specular: 3 }),
+  asset => new PhongShader(asset, uniforms, { ambient: 0, diffuse: 0, specular: 3 }),
   getCanvas('specular'),
 );
-render(head.model, new PhongShader(grayHead, uniforms), getCanvas('phong-gray'));
-render(head.model, new PhongShader(head, uniforms), getCanvas('phong'));
+render(grayHead, asset => new PhongShader(asset, uniforms), getCanvas('phong-gray'));
+render(head, asset => new PhongShader(asset, uniforms), getCanvas('phong'));
 
 // 3. 切线空间的法线贴图
-render(head.model, new TangentShader(head, uniforms), getCanvas('tangent'));
-render(head.model, new TangentShader({ ...head, diffuse: grid }, uniforms), getCanvas('grid'));
+render(head, asset => new TangentShader(asset, uniforms), getCanvas('tangent'));
+render(head, asset => new TangentShader({ ...asset, diffuse: grid }, uniforms), getCanvas('grid'));
 
 // 4. 暗黑破坏神：模型空间 vs 切线空间
 // 光从右边照过来，这样更容易看出两种法线贴图的区别
 const diabloUniforms = createUniforms([0, 0, 3], [1, 0, 0.3]);
-render(diablo.model, new PhongShader(diablo, diabloUniforms), getCanvas('diablo-nm'));
-render(diablo.model, new TangentShader(diablo, diabloUniforms), getCanvas('diablo-tangent'));
+render([diablo], asset => new PhongShader(asset, diabloUniforms), getCanvas('diablo-nm'));
+render([diablo], asset => new TangentShader(asset, diabloUniforms), getCanvas('diablo-tangent'));

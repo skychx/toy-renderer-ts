@@ -20,8 +20,8 @@ import {
   sub,
   transformDirection,
 } from './math';
-import { loadModel } from './model';
-import { loadTexture } from './texture';
+import { Model, loadModel } from './model';
+import { Texture, loadTexture } from './texture';
 
 // 主线程发来的消息：一开始是画布，之后相机每动一下，就发来一份新的 uniform
 let canvas: OffscreenCanvas | null = null;
@@ -31,21 +31,29 @@ onmessage = (e: MessageEvent) => {
   if (e.data.uniforms) uniforms = e.data.uniforms;
 };
 
-const model = await loadModel('/obj/african_head/african_head.obj');
-const diffuseMap = await loadTexture('/obj/african_head/african_head_diffuse.png');
-const normalMap = await loadTexture('/obj/african_head/african_head_nm_tangent.png');
-const specularMap = await loadTexture('/obj/african_head/african_head_spec.png');
+type Asset = {
+  model: Model;
+  diffuseMap: Texture;
+  normalMap: Texture;
+  specularMap: Texture;
+};
 
-// 从法线贴图里取值时，尺寸相同就能复用漫反射贴图的像素下标
-// 在加载后检查一次；以后换成不同尺寸的贴图，也能各自按 uv 寻址
-const normalMatchesDiffuse =
-  normalMap.width === diffuseMap.width && normalMap.height === diffuseMap.height;
-const specularMatchesDiffuse =
-  specularMap.width === diffuseMap.width && specularMap.height === diffuseMap.height;
+// 双眼网格已经位于头部的坐标系中，但 UV 和材质需要单独加载。
+const assets: Asset[] = await Promise.all(
+  ['african_head', 'african_head_eye_inner'].map(async name => ({
+    model: await loadModel(`/obj/african_head/${name}.obj`),
+    diffuseMap: await loadTexture(`/obj/african_head/${name}_diffuse.png`),
+    normalMap: await loadTexture(`/obj/african_head/${name}_nm_tangent.png`),
+    specularMap: await loadTexture(`/obj/african_head/${name}_spec.png`),
+  })),
+);
 
 // 和 WGSL 着色器做一样的事：切线空间的法线贴图 + Phong 光照，基本就是 day8 的 TangentShader
 class PhongShader implements IShader {
+  asset: Asset;
   uniforms: Uniforms;
+  normalMatchesDiffuse: boolean;
+  specularMatchesDiffuse: boolean;
   varyingUV: Vec2[] = [
     [0, 0],
     [0, 0],
@@ -63,11 +71,19 @@ class PhongShader implements IShader {
   ]; // 三角形的三个顶点（相机坐标系）
   tangentBasis: [Vec3, Vec3] | null = null; // 当前三角形的单位切线 T 和副切线 B
 
-  constructor(uniforms: Uniforms) {
+  constructor(asset: Asset, uniforms: Uniforms) {
+    this.asset = asset;
     this.uniforms = uniforms;
+    // 同尺寸贴图可共用采样下标；每套材质分别检查一次。
+    const { diffuseMap, normalMap, specularMap } = asset;
+    this.normalMatchesDiffuse =
+      normalMap.width === diffuseMap.width && normalMap.height === diffuseMap.height;
+    this.specularMatchesDiffuse =
+      specularMap.width === diffuseMap.width && specularMap.height === diffuseMap.height;
   }
 
   vertex(iface: number, nthvert: number): Vec4 {
+    const { model } = this.asset;
     this.varyingUV[nthvert] = model.uv(iface, nthvert);
     this.varyingNormal[nthvert] = transformDirection(
       this.uniforms.ModelViewIT,
@@ -101,6 +117,7 @@ class PhongShader implements IShader {
   }
 
   fragment(bar: Vec3): Color | null {
+    const { diffuseMap, normalMap, specularMap } = this.asset;
     // Before：每张贴图都对同一个 uv 做取整、限幅，再创建 RGB 数组
     // After：同尺寸时共用下标，直接读通道；uv 插值也不再创建临时数组
     const [uv0, uv1, uv2] = this.varyingUV;
@@ -125,7 +142,7 @@ class PhongShader implements IShader {
       pz = nz;
     if (this.tangentBasis) {
       const [T, B] = this.tangentBasis;
-      const normalIndex = normalMatchesDiffuse ? index : normalMap.index(u, v);
+      const normalIndex = this.normalMatchesDiffuse ? index : normalMap.index(u, v);
       // nm = normalize(rgb / 255 * 2 - 1)：直接用分量解码，省掉中间数组
       let nmx = (normalMap.data[normalIndex] / 255) * 2 - 1;
       let nmy = (normalMap.data[normalIndex + 1] / 255) * 2 - 1;
@@ -169,7 +186,7 @@ class PhongShader implements IShader {
 
     const ambient = 0.3;
     const diffuse = Math.max(0, dotNL);
-    const specularIndex = specularMatchesDiffuse ? index : specularMap.index(u, v);
+    const specularIndex = this.specularMatchesDiffuse ? index : specularMap.index(u, v);
     const strength = specularMap.data[specularIndex] / 255;
     const specular = strength * Math.pow(Math.max(0, rx * vx + ry * vy + rz * vz), 20);
 
@@ -190,11 +207,15 @@ function render(canvas: OffscreenCanvas, uniforms: Uniforms) {
   // OpenGL 里 z 越小离相机越近，所以 zbuffer 一开始要填成无穷远
   const zbuffer = new Float32Array(width * height).fill(Infinity);
   const Viewport = viewport(0, 0, width, height);
-  const shader = new PhongShader(uniforms);
-  for (let i = 0; i < model.nfaces(); i++) {
-    const clip: Vec4[] = [shader.vertex(i, 0), shader.vertex(i, 1), shader.vertex(i, 2)];
-    shader.prepareTriangle();
-    triangle(clip, shader, Viewport, zbuffer, frame);
+  // 每帧只清空一次：切换到眼球时保留头部的深度，避免穿过眼睑。
+  for (const asset of assets) {
+    const { model } = asset;
+    const shader = new PhongShader(asset, uniforms);
+    for (let i = 0; i < model.nfaces(); i++) {
+      const clip: Vec4[] = [shader.vertex(i, 0), shader.vertex(i, 1), shader.vertex(i, 2)];
+      shader.prepareTriangle();
+      triangle(clip, shader, Viewport, zbuffer, frame);
+    }
   }
   canvas.getContext('2d')!.putImageData(frame.imageData, 0, 0);
 }

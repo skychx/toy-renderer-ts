@@ -101,41 +101,47 @@ function perspMatrix(v: Vec3): Vec3 {
   return [x / w, y / w, z / w];
 }
 
-// 渲染一个带纹理的模型，project 决定了每个顶点怎么投影
+// 渲染一组带纹理的模型，project 决定了每个顶点怎么投影
 function render(
-  model: Model,
-  texture: Texture,
+  assets: { model: Model; texture: Texture }[],
   canvas: HTMLCanvasElement,
   project: (v: Vec3) => Vec3,
 ) {
   const frame = new Frame(width, height);
   const zbuffer = new Float32Array(width * height).fill(-Infinity);
 
-  for (let i = 0; i < model.nfaces(); i++) {
-    const face = model.face(i);
-    const screenCoords: Vec3[] = [];
-    const worldCoords: Vec3[] = [];
-    const uvs: Vec2[] = [];
+  // 头部和双眼使用各自的贴图，共用帧缓冲与深度缓冲。
+  for (const { model, texture } of assets) {
+    for (let i = 0; i < model.nfaces(); i++) {
+      const face = model.face(i);
+      const screenCoords: Vec3[] = [];
+      const worldCoords: Vec3[] = [];
+      const uvs: Vec2[] = [];
 
-    for (let j = 0; j < 3; j++) {
-      const v = model.vert(face[j]);
-      worldCoords.push(v);
-      screenCoords.push(world2screen(project(v))); // 先投影，再做视口变换
-      uvs.push(model.uv(i, j));
-    }
+      for (let j = 0; j < 3; j++) {
+        const v = model.vert(face[j]);
+        worldCoords.push(v);
+        screenCoords.push(world2screen(project(v))); // 先投影，再做视口变换
+        uvs.push(model.uv(i, j));
+      }
 
-    const intensity = lightIntensity(worldCoords);
-    if (intensity > 0) {
-      triangleWithTexture(screenCoords, uvs, zbuffer, frame, texture, intensity);
+      const intensity = lightIntensity(worldCoords);
+      if (intensity > 0) {
+        triangleWithTexture(screenCoords, uvs, zbuffer, frame, texture, intensity);
+      }
     }
   }
 
   frame.render(canvas);
 }
 
-const model = await loadModel('/obj/african_head/african_head.obj');
-const texture = await loadTexture('/obj/african_head/african_head_diffuse.png');
+const assets = await Promise.all(
+  ['african_head', 'african_head_eye_inner'].map(async name => ({
+    model: await loadModel(`/obj/african_head/${name}.obj`),
+    texture: await loadTexture(`/obj/african_head/${name}_diffuse.png`),
+  })),
+);
 
-render(model, texture, document.querySelector<HTMLCanvasElement>('#ortho')!, ortho);
-render(model, texture, document.querySelector<HTMLCanvasElement>('#persp')!, persp);
-render(model, texture, document.querySelector<HTMLCanvasElement>('#persp-matrix')!, perspMatrix);
+render(assets, document.querySelector<HTMLCanvasElement>('#ortho')!, ortho);
+render(assets, document.querySelector<HTMLCanvasElement>('#persp')!, persp);
+render(assets, document.querySelector<HTMLCanvasElement>('#persp-matrix')!, perspMatrix);

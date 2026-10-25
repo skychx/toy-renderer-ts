@@ -112,22 +112,23 @@ function drawBarycentricTriangle(canvas: HTMLCanvasElement) {
 
 // 给模型的每个三角形随机上色
 async function drawRandomColorModel(canvas: HTMLCanvasElement) {
-  const model = await loadModel('/obj/african_head/african_head.obj');
   const frame = new Frame(width, height);
 
-  for (let i = 0; i < model.nfaces(); i++) {
-    const face = model.face(i);
-    const screenCoords: Vec2[] = [];
-    for (let j = 0; j < 3; j++) {
-      const v = model.vert(face[j]);
-      screenCoords.push([
-        Math.floor(((v[0] + 1) * width) / 2),
-        Math.floor(((v[1] + 1) * height) / 2),
-      ]);
-    }
+  for (const model of models) {
+    for (let i = 0; i < model.nfaces(); i++) {
+      const face = model.face(i);
+      const screenCoords: Vec2[] = [];
+      for (let j = 0; j < 3; j++) {
+        const v = model.vert(face[j]);
+        screenCoords.push([
+          Math.floor(((v[0] + 1) * width) / 2),
+          Math.floor(((v[1] + 1) * height) / 2),
+        ]);
+      }
 
-    const randomColor: Color = [Math.random() * 255, Math.random() * 255, Math.random() * 255];
-    triangle(screenCoords, frame, randomColor);
+      const randomColor: Color = [Math.random() * 255, Math.random() * 255, Math.random() * 255];
+      triangle(screenCoords, frame, randomColor);
+    }
   }
 
   frame.render(canvas);
@@ -135,36 +136,37 @@ async function drawRandomColorModel(canvas: HTMLCanvasElement) {
 
 // 用一个模拟光照给三角形着色
 async function drawLightModel(canvas: HTMLCanvasElement) {
-  const model = await loadModel('/obj/african_head/african_head.obj');
   const frame = new Frame(width, height);
   const lightDir: Vec3 = [0, 0, -1]; // 假设光是垂直屏幕照进去的
 
-  for (let i = 0; i < model.nfaces(); i++) {
-    const face = model.face(i);
-    const screenCoords: Vec2[] = [];
-    const worldCoords: Vec3[] = [];
+  for (const model of models) {
+    for (let i = 0; i < model.nfaces(); i++) {
+      const face = model.face(i);
+      const screenCoords: Vec2[] = [];
+      const worldCoords: Vec3[] = [];
 
-    // 计算世界坐标和屏幕坐标
-    for (let j = 0; j < 3; j++) {
-      const v = model.vert(face[j]);
-      // 投影为正交投影，而且只做了个简单的视口变换
-      screenCoords.push([
-        Math.floor(((v[0] + 1) * width) / 2),
-        Math.floor(((v[1] + 1) * height) / 2),
-      ]);
-      worldCoords.push(v);
-    }
+      // 计算世界坐标和屏幕坐标
+      for (let j = 0; j < 3; j++) {
+        const v = model.vert(face[j]);
+        // 投影为正交投影，而且只做了个简单的视口变换
+        screenCoords.push([
+          Math.floor(((v[0] + 1) * width) / 2),
+          Math.floor(((v[1] + 1) * height) / 2),
+        ]);
+        worldCoords.push(v);
+      }
 
-    // 计算世界坐标中某个三角形的法线（法线 = 三角形任意两条边做叉乘），然后做归一化
-    const n = normalize(
-      cross(sub(worldCoords[2], worldCoords[0]), sub(worldCoords[1], worldCoords[0])),
-    );
+      // 计算世界坐标中某个三角形的法线（法线 = 三角形任意两条边做叉乘），然后做归一化
+      const n = normalize(
+        cross(sub(worldCoords[2], worldCoords[0]), sub(worldCoords[1], worldCoords[0])),
+      );
 
-    // 三角形法线和光照方向做点乘，点乘值大于 0，说明法线方向和光照方向在同一侧
-    // 值越大，说明越多的光照射到三角形上，颜色越白
-    const intensity = dot(n, lightDir);
-    if (intensity > 0) {
-      triangle(screenCoords, frame, [intensity * 255, intensity * 255, intensity * 255]);
+      // 三角形法线和光照方向做点乘，点乘值大于 0，说明法线方向和光照方向在同一侧
+      // 值越大，说明越多的光照射到三角形上，颜色越白
+      const intensity = dot(n, lightDir);
+      if (intensity > 0) {
+        triangle(screenCoords, frame, [intensity * 255, intensity * 255, intensity * 255]);
+      }
     }
   }
 
@@ -173,5 +175,11 @@ async function drawLightModel(canvas: HTMLCanvasElement) {
 
 drawCrossProductTriangle(document.querySelector<HTMLCanvasElement>('#cross-product')!);
 drawBarycentricTriangle(document.querySelector<HTMLCanvasElement>('#barycentric')!);
+// 本章还没有深度测试：先画眼球，再画头部，让眼睑盖住眼球边缘。
+// 这仍是依赖绘制顺序的近似，下一章用 zbuffer 正确解决遮挡。
+const models = await Promise.all([
+  loadModel('/obj/african_head/african_head_eye_inner.obj'),
+  loadModel('/obj/african_head/african_head.obj'),
+]);
 await drawRandomColorModel(document.querySelector<HTMLCanvasElement>('#random-colors')!);
 await drawLightModel(document.querySelector<HTMLCanvasElement>('#light')!);

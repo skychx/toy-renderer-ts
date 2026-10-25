@@ -114,22 +114,6 @@ async function createWebGPURenderer(canvas: HTMLCanvasElement, onError: (message
   const format = navigator.gpu.getPreferredCanvasFormat();
   context.configure({ device, format, alphaMode: 'opaque' });
 
-  const model = await loadModel('/obj/african_head/african_head.obj');
-  // obj 的位置、uv、法线各有自己的索引；展开后，每个顶点连续存 3 + 3 + 2 个数
-  const vertices: number[] = [];
-  for (let i = 0; i < model.nfaces(); i++) {
-    for (let j = 0; j < 3; j++) {
-      vertices.push(...model.vert(i, j), ...model.normal(i, j), ...model.uv(i, j));
-    }
-  }
-  const vertexData = new Float32Array(vertices);
-  const vertexBuffer = device.createBuffer({
-    label: '位置、法线、uv',
-    size: vertexData.byteLength,
-    usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-  });
-  device.queue.writeBuffer(vertexBuffer, 0, vertexData);
-
   // 三个 mat4 各占 16 个 float，光照方向用一个 vec4，共 52 × 4 = 208 字节
   const uniformData = new Float32Array(52);
   const uniformBuffer = device.createBuffer({
@@ -175,9 +159,6 @@ async function createWebGPURenderer(canvas: HTMLCanvasElement, onError: (message
     bitmap.close();
     return texture.createView();
   }
-  const diffuse = await loadTexture('/obj/african_head/african_head_diffuse.png');
-  const normal = await loadTexture('/obj/african_head/african_head_nm_tangent.png');
-  const specular = await loadTexture('/obj/african_head/african_head_spec.png');
   const sampler = device.createSampler({
     magFilter: 'linear',
     minFilter: 'linear',
@@ -209,17 +190,40 @@ async function createWebGPURenderer(canvas: HTMLCanvasElement, onError: (message
     primitive: { topology: 'triangle-list', cullMode: 'none' },
     depthStencil: { format: 'depth24plus', depthWriteEnabled: true, depthCompare: 'less' },
   });
-  // 把实际资源和 WGSL 的 @binding 编号连接起来
-  const bindGroup = device.createBindGroup({
-    layout: pipeline.getBindGroupLayout(0),
-    entries: [
-      { binding: 0, resource: { buffer: uniformBuffer } },
-      { binding: 1, resource: sampler },
-      { binding: 2, resource: diffuse },
-      { binding: 3, resource: normal },
-      { binding: 4, resource: specular },
-    ],
-  });
+  const meshes: { vertexBuffer: GPUBuffer; vertexCount: number; bindGroup: GPUBindGroup }[] = [];
+  for (const name of ['african_head', 'african_head_eye_inner']) {
+    const model = await loadModel(`/obj/african_head/${name}.obj`);
+    // obj 的位置、uv、法线各有自己的索引；展开后，每个顶点连续存 3 + 3 + 2 个数
+    const vertices: number[] = [];
+    for (let i = 0; i < model.nfaces(); i++) {
+      for (let j = 0; j < 3; j++) {
+        vertices.push(...model.vert(i, j), ...model.normal(i, j), ...model.uv(i, j));
+      }
+    }
+    const vertexData = new Float32Array(vertices);
+    const vertexBuffer = device.createBuffer({
+      label: `${name}：位置、法线、uv`,
+      size: vertexData.byteLength,
+      usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+    });
+    device.queue.writeBuffer(vertexBuffer, 0, vertexData);
+
+    // 每个网格绑定自己的三张贴图，相机、光照、采样器和管线仍然共用。
+    const diffuse = await loadTexture(`/obj/african_head/${name}_diffuse.png`);
+    const normal = await loadTexture(`/obj/african_head/${name}_nm_tangent.png`);
+    const specular = await loadTexture(`/obj/african_head/${name}_spec.png`);
+    const bindGroup = device.createBindGroup({
+      layout: pipeline.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: { buffer: uniformBuffer } },
+        { binding: 1, resource: sampler },
+        { binding: 2, resource: diffuse },
+        { binding: 3, resource: normal },
+        { binding: 4, resource: specular },
+      ],
+    });
+    meshes.push({ vertexBuffer, vertexCount: model.nfaces() * 3, bindGroup });
+  }
   // 对应软渲染器的 zbuffer，WebGPU 要显式创建深度贴图
   const depthTexture = device.createTexture({
     size: [canvas.width, canvas.height],
@@ -255,9 +259,12 @@ async function createWebGPURenderer(canvas: HTMLCanvasElement, onError: (message
       },
     });
     pass.setPipeline(pipeline);
-    pass.setBindGroup(0, bindGroup);
-    pass.setVertexBuffer(0, vertexBuffer);
-    pass.draw(model.nfaces() * 3);
+    // 同一个 render pass 中画完头部和双眼，中途不清除深度贴图。
+    for (const mesh of meshes) {
+      pass.setBindGroup(0, mesh.bindGroup);
+      pass.setVertexBuffer(0, mesh.vertexBuffer);
+      pass.draw(mesh.vertexCount);
+    }
     pass.end();
     device.queue.submit([encoder.finish()]);
   };

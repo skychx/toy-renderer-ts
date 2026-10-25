@@ -41,6 +41,11 @@ diff -r days/day04 days/day05
 画布在 HTML 中声明真实宽高，先显示加载占位，收到各自的首帧通知后再展示结果，避免加载时页面跳动。
 各章节通过外部入口 `page.ts` 启动，再加载 `main.ts`；保持外部 `script src`，让 Bun 正确打包模块导入。
 
+人头示例同时加载头部 `african_head.obj` 和独立双眼 `african_head_eye_inner.obj`，模型坐标已经对齐。
+每个网格使用自己的贴图；从 day4 开始，同一张图里的网格共用帧缓冲和深度缓冲，让眼睑正确遮挡眼球。
+day2 保留线框，day3 先画眼球再画头部，继续展示引入深度测试前依赖绘制顺序的局限。
+day10 的环境光遮蔽采样也包含双眼；两个 WebGPU 番外的 CPU、GPU 均绘制同一组网格和材质。
+
 ## 软渲染性能对照
 
 先打开 http://localhost:8080/extra-webgpu，观察左侧未优化的 Canvas 2D 软渲染与右侧 WebGPU 的差距。

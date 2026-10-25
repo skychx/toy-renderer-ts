@@ -97,17 +97,21 @@ function getCanvas(id: string) {
 
 const diablo = await loadModel('/obj/diablo3_pose/diablo3_pose.obj');
 const head = await loadModel('/obj/african_head/african_head.obj');
+const eyes = await loadModel('/obj/african_head/african_head_eye_inner.obj');
 const M = matMul(projection(length(eye)), lookAt(eye, [0, 0, 0], [0, 1, 0]));
 
 // 渲染模型，返回画好的帧缓冲和 zbuffer
-function render(model: Model, color: Color, toon: boolean) {
+function render(items: [Model, Color][], toon: boolean) {
   const frame = new Frame(width, height);
   frame.clear([255, 255, 255]); // 卡通风格配白色的背景
   const zbuffer = new Float32Array(width * height).fill(-Infinity);
-  const shader = new ToonShader(model, color, M, toon);
-  for (let i = 0; i < model.nfaces(); i++) {
-    const clip: Vec4[] = [shader.vertex(i, 0), shader.vertex(i, 1), shader.vertex(i, 2)];
-    triangle(clip, shader, Viewport, zbuffer, frame);
+  // 先把所有网格画进同一个 zbuffer，之后的轮廓检测才能看到完整模型。
+  for (const [model, color] of items) {
+    const shader = new ToonShader(model, color, M, toon);
+    for (let i = 0; i < model.nfaces(); i++) {
+      const clip: Vec4[] = [shader.vertex(i, 0), shader.vertex(i, 1), shader.vertex(i, 2)];
+      triangle(clip, shader, Viewport, zbuffer, frame);
+    }
   }
   return { frame, zbuffer };
 }
@@ -126,8 +130,8 @@ function drawEdges(frame: Frame, edges: Float32Array) {
 const orange: Color = [240, 150, 90];
 
 // 1. 平滑的光照 vs 分成 3 档的光照
-render(diablo, orange, false).frame.render(getCanvas('smooth'));
-const { frame, zbuffer } = render(diablo, orange, true);
+render([[diablo, orange]], false).frame.render(getCanvas('smooth'));
+const { frame, zbuffer } = render([[diablo, orange]], true);
 frame.render(getCanvas('bands'));
 
 // 2. 对 zbuffer 做边缘检测，变化剧烈的地方就是轮廓
@@ -142,6 +146,12 @@ drawEdges(frame, edges);
 frame.render(getCanvas('toon'));
 
 // 4. 换成人头试试
-const headResult = render(head, [230, 180, 140], true);
+const headResult = render(
+  [
+    [head, [230, 180, 140]],
+    [eyes, [230, 230, 230]],
+  ],
+  true,
+);
 drawEdges(headResult.frame, sobel(headResult.zbuffer));
 headResult.frame.render(getCanvas('head'));

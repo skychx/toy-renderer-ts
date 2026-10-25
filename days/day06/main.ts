@@ -132,12 +132,12 @@ function triangle(
   }
 }
 
-// 渲染模型：shading 决定用 flat 着色还是 Gouraud 着色，texture 为 null 时不贴纹理
+// 渲染模型：shading 决定用 flat 着色还是 Gouraud 着色，textured 决定是否贴纹理
 function render(
-  model: Model,
+  assets: { model: Model; texture: Texture }[],
   canvas: HTMLCanvasElement,
   shading: 'flat' | 'gouraud',
-  texture: Texture | null,
+  textured: boolean,
 ) {
   const frame = new Frame(width, height);
   const zbuffer = new Float32Array(width * height).fill(-Infinity);
@@ -149,41 +149,48 @@ function render(
   // 坐标变换链：Viewport × Projection × ModelView，先把三个矩阵乘好，每个顶点只用乘一次
   const M = matMul(Viewport, matMul(Projection, ModelView));
 
-  for (let i = 0; i < model.nfaces(); i++) {
-    const face = model.face(i);
-    const screenCoords: Vec3[] = [];
-    const worldCoords: Vec3[] = [];
-    const intensities: number[] = [];
-    const uvs: Vec2[] = [];
+  // 每个网格用自己的 UV 和贴图，但遮挡关系在同一个 zbuffer 中比较。
+  for (const { model, texture } of assets) {
+    for (let i = 0; i < model.nfaces(); i++) {
+      const face = model.face(i);
+      const screenCoords: Vec3[] = [];
+      const worldCoords: Vec3[] = [];
+      const intensities: number[] = [];
+      const uvs: Vec2[] = [];
 
-    for (let j = 0; j < 3; j++) {
-      const v = model.vert(face[j]);
-      const [x, y, z, w] = matVec(M, [v[0], v[1], v[2], 1] as Vec4);
-      // 透视除法：除以 w 变回三维坐标；x、y 四舍五入成整数，z 留给 zbuffer 用
-      screenCoords.push([Math.round(x / w), Math.round(y / w), z / w]);
-      worldCoords.push(v);
-      // Gouraud 着色：用模型文件里每个顶点的法线，算出每个顶点的光照强度
-      intensities.push(Math.max(0, dot(model.normal(i, j), light)));
-      uvs.push(model.uv(i, j));
+      for (let j = 0; j < 3; j++) {
+        const v = model.vert(face[j]);
+        const [x, y, z, w] = matVec(M, [v[0], v[1], v[2], 1] as Vec4);
+        // 透视除法：除以 w 变回三维坐标；x、y 四舍五入成整数，z 留给 zbuffer 用
+        screenCoords.push([Math.round(x / w), Math.round(y / w), z / w]);
+        worldCoords.push(v);
+        // Gouraud 着色：用模型文件里每个顶点的法线，算出每个顶点的光照强度
+        intensities.push(Math.max(0, dot(model.normal(i, j), light)));
+        uvs.push(model.uv(i, j));
+      }
+
+      if (shading === 'flat') {
+        // flat 着色：整个三角形只用一个法线，三个顶点的光照强度都一样
+        const n = normalize(
+          cross(sub(worldCoords[1], worldCoords[0]), sub(worldCoords[2], worldCoords[0])),
+        );
+        intensities.fill(Math.max(0, dot(n, light)));
+      }
+
+      triangle(screenCoords, intensities, uvs, textured ? texture : null, zbuffer, frame);
     }
-
-    if (shading === 'flat') {
-      // flat 着色：整个三角形只用一个法线，三个顶点的光照强度都一样
-      const n = normalize(
-        cross(sub(worldCoords[1], worldCoords[0]), sub(worldCoords[2], worldCoords[0])),
-      );
-      intensities.fill(Math.max(0, dot(n, light)));
-    }
-
-    triangle(screenCoords, intensities, uvs, texture, zbuffer, frame);
   }
 
   frame.render(canvas);
 }
 
-const model = await loadModel('/obj/african_head/african_head.obj');
-const texture = await loadTexture('/obj/african_head/african_head_diffuse.png');
+const assets = await Promise.all(
+  ['african_head', 'african_head_eye_inner'].map(async name => ({
+    model: await loadModel(`/obj/african_head/${name}.obj`),
+    texture: await loadTexture(`/obj/african_head/${name}_diffuse.png`),
+  })),
+);
 
-render(model, document.querySelector<HTMLCanvasElement>('#flat')!, 'flat', null);
-render(model, document.querySelector<HTMLCanvasElement>('#gouraud')!, 'gouraud', null);
-render(model, document.querySelector<HTMLCanvasElement>('#texture')!, 'gouraud', texture);
+render(assets, document.querySelector<HTMLCanvasElement>('#flat')!, 'flat', false);
+render(assets, document.querySelector<HTMLCanvasElement>('#gouraud')!, 'gouraud', false);
+render(assets, document.querySelector<HTMLCanvasElement>('#texture')!, 'gouraud', true);
