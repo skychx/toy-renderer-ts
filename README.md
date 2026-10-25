@@ -15,7 +15,7 @@ bun dev
 
 打开 http://localhost:8080 就能看到每一天的渲染结果。
 
-GPU 番外的 [代码](days/extra-webgpu) 已升级为 [WebGPU](https://developer.mozilla.org/en-US/docs/Web/API/WebGPU_API)；旧教程链接仍然保留。
+GPU 番外使用 [WebGPU](https://developer.mozilla.org/en-US/docs/Web/API/WebGPU_API)，分为[未优化版](days/extra-webgpu)和[优化版](days/extra-webgpu-optimized)；旧教程链接仍然保留。
 使用支持 WebGPU 的浏览器，通过 localhost 或 HTTPS 打开，即可对比 CPU 软渲染与 GPU 渲染的实时帧率。
 代码中用 [WGSL](https://www.w3.org/TR/WGSL/) 对照 TypeScript 着色器，并注释了资源绑定、矩阵上传和深度范围的区别。
 
@@ -36,23 +36,49 @@ GPU 番外的 [代码](days/extra-webgpu) 已升级为 [WebGPU](https://develope
 diff -r days/day04 days/day05
 ```
 
+## 软渲染性能对照
+
+先打开 http://localhost:8080/extra-webgpu，观察左侧未优化的 Canvas 2D 软渲染与右侧 WebGPU 的差距。
+再打开 http://localhost:8080/extra-webgpu-optimized，观察优化后的软渲染帧率。
+
+两版使用相同的模型、贴图、Phong 光照、初始相机和 800×800 内部分辨率，WebGPU 的实现也相同。
+Canvas 2D 只负责显示 CPU 算出的像素，优化版没有把光栅化或光照交给 GPU。
+比较时在同一个标签页切换两版，在相同视角、资源加载完成后读取 FPS，避免两个软渲染 Worker 同时运行带来的资源竞争。
+
+优化版完整复制原版，保留每篇代码可独立阅读、运行的结构，集中做三组优化：
+
+| 优化               | Before                                         | After                                                    | 主要文件                    |
+| ------------------ | ---------------------------------------------- | -------------------------------------------------------- | --------------------------- |
+| 切线基预计算       | 每个像素重复求逆、计算切线和副切线             | 每个三角形计算一次，片元复用                             | `software.ts`               |
+| 重心坐标与光栅化   | 每个候选像素重新做叉乘、除法和数组分配         | 预计算边与面积，逐行增量更新分子，先做内外判断和深度测试 | `gl.ts`                     |
+| 片元计算与纹理采样 | 向量函数创建中间数组，三张贴图分别计算像素下标 | 热点计算展开成分量，同尺寸贴图共用下标、直接读取通道     | `software.ts`、`texture.ts` |
+
+直接比较两个章节，能看到每组改动对应的公式和 Before/After 注释：
+
+```bash
+diff -ru days/extra-webgpu days/extra-webgpu-optimized
+```
+
+帧率随设备、视角和浏览器变化；WebGPU 一侧统计浏览器调度的绘制帧数，不能当成 GPU 的极限吞吐量。
+
 ## 教程
 
-| 章节                                                                                                        | 代码                                             |
-| ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
-| [day1：环境搭建](https://supercodepower.com/docs/toy-renderer/day1-env-setup)                               | [days/day01](days/day01)                         |
-| [day2：画一条线](https://supercodepower.com/docs/toy-renderer/day2-draw-line)                               | [days/day02](days/day02)                         |
-| [day3：画一个三角形](https://supercodepower.com/docs/toy-renderer/day3-draw-triangle)                       | [days/day03](days/day03)                         |
-| [day4：Z-buffering](https://supercodepower.com/docs/toy-renderer/day4-Z-buffering)                          | [days/day04](days/day04)                         |
-| [day5：透视投影](https://supercodepower.com/docs/toy-renderer/day5-Perspective-projection)                  | [days/day05](days/day05)                         |
-| [day6：移动相机](https://supercodepower.com/docs/toy-renderer/day6-Moving-the-camera)                       | [days/day06](days/day06)                         |
-| [day7：着色器](https://supercodepower.com/docs/toy-renderer/day7-Shaders)                                   | [days/day07](days/day07)                         |
-| [day8：Phong 光照与法线贴图](https://supercodepower.com/docs/toy-renderer/day8-Normal-mapping)              | [days/day08](days/day08)                         |
-| [day9：阴影](https://supercodepower.com/docs/toy-renderer/day9-Shadow-mapping)                              | [days/day09](days/day09)                         |
-| [day10：环境光遮蔽](https://supercodepower.com/docs/toy-renderer/day10-Ambient-occlusion)                   | [days/day10](days/day10)                         |
-| [番外：透视校正插值](https://supercodepower.com/docs/toy-renderer/extra1-Perspective-correct-interpolation) | [days/extra-perspective](days/extra-perspective) |
-| [番外：卡通渲染](https://supercodepower.com/docs/toy-renderer/extra2-Toon-shading)                          | [days/extra-toon](days/extra-toon)               |
-| [番外：用 WebGPU 重写一遍](https://supercodepower.com/docs/toy-renderer/extra3-WebGL)                       | [days/extra-webgpu](days/extra-webgpu)           |
+| 章节                                                                                                        | 代码                                                       |
+| ----------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| [day1：环境搭建](https://supercodepower.com/docs/toy-renderer/day1-env-setup)                               | [days/day01](days/day01)                                   |
+| [day2：画一条线](https://supercodepower.com/docs/toy-renderer/day2-draw-line)                               | [days/day02](days/day02)                                   |
+| [day3：画一个三角形](https://supercodepower.com/docs/toy-renderer/day3-draw-triangle)                       | [days/day03](days/day03)                                   |
+| [day4：Z-buffering](https://supercodepower.com/docs/toy-renderer/day4-Z-buffering)                          | [days/day04](days/day04)                                   |
+| [day5：透视投影](https://supercodepower.com/docs/toy-renderer/day5-Perspective-projection)                  | [days/day05](days/day05)                                   |
+| [day6：移动相机](https://supercodepower.com/docs/toy-renderer/day6-Moving-the-camera)                       | [days/day06](days/day06)                                   |
+| [day7：着色器](https://supercodepower.com/docs/toy-renderer/day7-Shaders)                                   | [days/day07](days/day07)                                   |
+| [day8：Phong 光照与法线贴图](https://supercodepower.com/docs/toy-renderer/day8-Normal-mapping)              | [days/day08](days/day08)                                   |
+| [day9：阴影](https://supercodepower.com/docs/toy-renderer/day9-Shadow-mapping)                              | [days/day09](days/day09)                                   |
+| [day10：环境光遮蔽](https://supercodepower.com/docs/toy-renderer/day10-Ambient-occlusion)                   | [days/day10](days/day10)                                   |
+| [番外：透视校正插值](https://supercodepower.com/docs/toy-renderer/extra1-Perspective-correct-interpolation) | [days/extra-perspective](days/extra-perspective)           |
+| [番外：卡通渲染](https://supercodepower.com/docs/toy-renderer/extra2-Toon-shading)                          | [days/extra-toon](days/extra-toon)                         |
+| [番外：用 WebGPU 重写一遍](https://supercodepower.com/docs/toy-renderer/extra3-WebGL)                       | [days/extra-webgpu](days/extra-webgpu)                     |
+| 番外：软渲染器性能优化                                                                                      | [days/extra-webgpu-optimized](days/extra-webgpu-optimized) |
 
 ## 致谢
 
