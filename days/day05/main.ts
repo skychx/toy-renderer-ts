@@ -68,8 +68,9 @@ function triangleWithTexture(
 }
 
 // 把模型坐标变换到屏幕坐标：x、y 做视口变换（四舍五入成整数），z 保持不变
+// 屏幕 y 轴朝下，所以模型里 y = 1 的「上方」对应屏幕的第 0 行
 function world2screen(v: Vec3): Vec3 {
-  return [Math.round(((v[0] + 1) * width) / 2), Math.round(((v[1] + 1) * height) / 2), v[2]];
+  return [Math.round(((v[0] + 1) * width) / 2), Math.round(((1 - v[1]) * height) / 2), v[2]];
 }
 
 // 计算三角形的光照强度

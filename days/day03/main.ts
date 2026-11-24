@@ -123,7 +123,7 @@ async function drawRandomColorModel(canvas: HTMLCanvasElement) {
       const v = model.vert(face[j]);
       screenCoords.push([
         Math.floor(((v[0] + 1) * width) / 2),
-        Math.floor(((v[1] + 1) * height) / 2),
+        Math.floor(((1 - v[1]) * height) / 2),
       ]);
     }
 
@@ -151,7 +151,7 @@ async function drawLightModel(canvas: HTMLCanvasElement) {
       // 投影为正交投影，而且只做了个简单的视口变换
       screenCoords.push([
         Math.floor(((v[0] + 1) * width) / 2),
-        Math.floor(((v[1] + 1) * height) / 2),
+        Math.floor(((1 - v[1]) * height) / 2),
       ]);
       worldCoords.push(v);
     }

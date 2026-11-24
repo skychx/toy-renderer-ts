@@ -156,7 +156,7 @@ async function renderFixture(chapter: string, hiddenEye: boolean, worker = false
   const M = math.matMul(Viewport, math.matMul(Projection, ModelView));
   const p = math.matVec(M, [x, 0, z, 1]);
   const image = document.querySelector(worker ? '#software' : '#tangent').image;
-  const index = ((799 - Math.round(p[1] / p[3])) * 800 + Math.round(p[0] / p[3])) * 4;
+  const index = (Math.round(p[1] / p[3]) * 800 + Math.round(p[0] / p[3])) * 4;
   return Array.from(image.data.slice(index, index + 3));
 }
 

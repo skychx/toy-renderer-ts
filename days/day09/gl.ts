@@ -39,11 +39,12 @@ export function projection(c: number): Mat {
   return m;
 }
 
-// 视口矩阵：把 [-1, 1] 范围内的 x、y 变换到屏幕上左下角为 (x, y)、宽 w 高 h 的区域里
+// 视口矩阵：把 [-1, 1] 范围内的 x、y 变换到屏幕上左上角为 (x, y)、宽 w 高 h 的区域里
+// 注意屏幕的 y 轴朝下：NDC 里 y = 1 的一端要对应屏幕的上方，所以 y 的系数是 -h/2
 export function viewport(x: number, y: number, w: number, h: number): Mat {
   return [
     [w / 2, 0, 0, x + w / 2],
-    [0, h / 2, 0, y + h / 2],
+    [0, -h / 2, 0, y + h / 2],
     [0, 0, 1, 0],
     [0, 0, 0, 1],
   ];

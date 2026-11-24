@@ -39,9 +39,8 @@ export class Frame {
       return;
     }
 
-    // canvas 的原点在左上角，y 轴朝下；我们习惯的坐标系原点在左下角，y 轴朝上
-    // 所以这里要把 y 翻转一下
-    const i = ((this.height - 1 - y) * this.width + x) * 4;
+    // 坐标系和 canvas 原生的一致：原点在左上角，y 轴朝下，y 正好就是像素所在的行号
+    const i = (y * this.width + x) * 4;
 
     const data = this.imageData.data;
     data[i] = color[0];

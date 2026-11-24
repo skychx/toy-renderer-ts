@@ -50,7 +50,7 @@ function line(x1: number, y1: number, x2: number, y2: number, frame: Frame, colo
   let dy = y2 - y1;
   let yi = 1;
 
-  // 处理 [-1, 0) 范围内的斜率：y 每次往下走
+  // 处理 [-1, 0) 范围内的斜率：x 每次加一，y 反而要减一
   if (dy < 0) {
     yi = -1;
     dy = -dy;
@@ -121,11 +121,12 @@ async function drawObj(canvas: HTMLCanvasElement) {
       const v1 = model.vert(face[(j + 1) % 3]);
 
       // 因为模型空间取值范围是 [-1, 1]^3，我们要把模型坐标平移到屏幕坐标中
-      // 下面 (point + 1) * width(height) / 2 的操作学名为视口变换（Viewport Transformation）
+      // 下面 (x + 1) * width / 2、(1 - y) * height / 2 的操作学名为视口变换（Viewport Transformation）
+      // 屏幕 y 轴朝下，所以模型里 y = 1 的「上方」对应屏幕的第 0 行
       const x0 = Math.floor(((v0[0] + 1) * width) / 2);
-      const y0 = Math.floor(((v0[1] + 1) * height) / 2);
+      const y0 = Math.floor(((1 - v0[1]) * height) / 2);
       const x1 = Math.floor(((v1[0] + 1) * width) / 2);
-      const y1 = Math.floor(((v1[1] + 1) * height) / 2);
+      const y1 = Math.floor(((1 - v1[1]) * height) / 2);
 
       // 画线
       line(x0, y0, x1, y1, frame, white);
