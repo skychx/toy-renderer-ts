@@ -24,6 +24,7 @@ GPU 番外使用 [WebGPU](https://developer.mozilla.org/en-US/docs/Web/API/WebGP
 ```bash
 .
 ├── days        # 每一天的代码，每个文件夹都是一份完整的、能单独运行的代码
+├── docs        # 补充文档（如 iframe 嵌入说明）
 ├── embed       # 博客 iframe 的单画布页面
 ├── obj         # 模型和贴图（来自 tinyrenderer，贴图从 tga 转成了 png）
 ├── scripts     # 准备素材用的脚本
